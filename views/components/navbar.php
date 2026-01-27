@@ -69,11 +69,7 @@ function renderEnhancedNavbar($currentPage = '', $additionalInfo = []) {
                         <i class="fas fa-chart-bar me-1"></i>Báo Cáo
                     </a>
                     <ul class="dropdown-menu dropdown-menu-dark">
-                        <li>
-                            <a class="dropdown-item <?= $baseName === 'report' ? 'active' : '' ?>" href="report.php">
-                                <i class="fas fa-users me-2"></i>Báo Cáo Khách Hàng
-                            </a>
-                        </li>
+                        
                         <li>
                             <a class="dropdown-item <?= $baseName === 'nhanvien_report' ? 'active' : '' ?>" 
                                href="nhanvien_report.php">
@@ -89,13 +85,7 @@ function renderEnhancedNavbar($currentPage = '', $additionalInfo = []) {
                     </ul>
                 </li>
 
-                <!-- Detection Section -->
-                <li class="nav-item">
-                    <a class="nav-link <?= $baseName === 'anomaly' ? 'active' : '' ?>" href="anomaly.php">
-                        <i class="fas fa-exclamation-triangle me-1"></i>
-                        <span class="badge bg-warning text-dark ms-1">Phát Hiện BT</span>
-                    </a>
-                </li>
+                
 
                 <!-- Data Management -->
                 <li class="nav-item dropdown">

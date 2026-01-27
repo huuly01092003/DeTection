@@ -5,9 +5,9 @@ session_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Nếu đã đăng nhập, chuyển về dashboard
+// Nếu đã đăng nhập, chuyển về nhanvien_report
 if (isset($_SESSION['user_id'])) {
-    header('Location: dashboard.php');
+    header('Location: nhanvien_report.php');
     exit;
 }
 
@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Debug
                 echo "<!-- DEBUG: Login successful! User ID: " . $user['id'] . " -->";
                 
-                // Redirect về trang được yêu cầu hoặc dashboard
-                $redirect = $_SESSION['redirect_after_login'] ?? 'dashboard.php';
+                // Redirect về trang được yêu cầu hoặc nhanvien_report (homepage mới)
+                $redirect = $_SESSION['redirect_after_login'] ?? 'nhanvien_report.php';
                 unset($_SESSION['redirect_after_login']);
                 
                 header('Location: ' . $redirect);

@@ -122,7 +122,7 @@ renderNavbar($currentPage);
                                 <button type="submit" class="btn btn-custom btn-lg">
                                     <i class="fas fa-upload me-2"></i>Import Dữ liệu
                                 </button>
-                                <a href="report.php" class="btn btn-outline-secondary btn-lg">
+                                <a href="nhanvien_report.php" class="btn btn-outline-secondary btn-lg">
                                     <i class="fas fa-chart-bar me-2"></i>Xem Báo cáo
                                 </a>
                             </div>

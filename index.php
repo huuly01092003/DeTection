@@ -1,11 +1,10 @@
 <?php
 /**
  * ============================================
- * NEW INDEX PAGE - REDIRECT TO AUTH SYSTEM
+ * INDEX PAGE - REDIRECT TO NHANVIEN_REPORT
  * ============================================
  * 
- * This replaces the old import page as homepage
- * Users must login first, then see dashboard (report page)
+ * Users must login first, then they will see nhanvien_report.php as homepage
  */
 
 session_start();
@@ -17,7 +16,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Logged in - redirect to dashboard (which redirects to report.php)
-header('Location: dashboard.php');
+// Logged in - redirect directly to nhanvien_report (main homepage)
+header('Location: nhanvien_report.php');
 exit;
 ?>
