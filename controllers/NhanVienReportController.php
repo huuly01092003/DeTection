@@ -333,6 +333,12 @@ class NhanVienReportController {
                             ]);
                         }
 
+                        // Tối ưu: Chỉ giữ lại Top 100 nhân viên trong report lịch sử để giảm dung lượng data
+                        uasort($report_hist, function($a, $b) {
+                            return $b['ds_tim_kiem'] <=> $a['ds_tim_kiem'];
+                        });
+                        $report_hist = array_slice($report_hist, 0, 100, true);
+
                         $history_data[$prevMonth] = [
                             'tu_ngay' => $tu_ngay_hist,
                             'den_ngay' => $den_ngay_hist,
