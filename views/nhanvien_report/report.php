@@ -207,16 +207,24 @@ $isViewer = isViewer();
                         </select>
                     </div>
                     
+                    <?php
+                        // Xác định min/max cho input date dựa trên tháng đã chọn
+                        $current_range = $date_ranges[$thang] ?? null;
+                        $min_date = $current_range ? $current_range['min_date'] : ($thang . '-01');
+                        $max_date = $current_range ? $current_range['max_date'] : date('Y-m-t', strtotime($thang . '-01'));
+                    ?>
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar"></i> Từ Ngày</label>
                         <input type="date" name="tu_ngay" id="tuNgay" class="form-control" 
-                               value="<?= htmlspecialchars($tu_ngay) ?>" required>
+                               value="<?= htmlspecialchars($tu_ngay) ?>" 
+                               min="<?= $min_date ?>" max="<?= $max_date ?>" required>
                     </div>
                     
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar"></i> Đến Ngày</label>
                         <input type="date" name="den_ngay" id="denNgay" class="form-control" 
-                               value="<?= htmlspecialchars($den_ngay) ?>" required>
+                               value="<?= htmlspecialchars($den_ngay) ?>" 
+                               min="<?= $min_date ?>" max="<?= $max_date ?>" required>
                     </div>
                     
                     <div class="col-md-2">
@@ -1508,6 +1516,42 @@ document.addEventListener('DOMContentLoaded', function() {
             // Load heatmap chart if not loaded yet
             if (!currentHeatmapData) {
                 loadHeatmapChart('all');
+            }
+        });
+    }
+
+    // ✅ CẬP NHẬT GIỚI HẠN NGÀY KHI CHỌN THÁNG
+    const selectThang = document.getElementById('selectThang');
+    const tuNgay = document.getElementById('tuNgay');
+    const denNgay = document.getElementById('denNgay');
+    const dateRanges = <?= json_encode($date_ranges ?? []) ?>;
+
+    if (selectThang && tuNgay && denNgay) {
+        selectThang.addEventListener('change', function() {
+            const selected = this.value;
+            const range = dateRanges[selected];
+            
+            if (range) {
+                tuNgay.min = range.min_date;
+                tuNgay.max = range.max_date;
+                tuNgay.value = range.min_date;
+                
+                denNgay.min = range.min_date;
+                denNgay.max = range.max_date;
+                denNgay.value = range.max_date;
+            } else {
+                const firstDay = selected + '-01';
+                // Tạm tính ngày cuối tháng
+                const date = new Date(selected + '-01');
+                const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+                
+                tuNgay.min = firstDay;
+                tuNgay.max = lastDay;
+                tuNgay.value = firstDay;
+                
+                denNgay.min = firstDay;
+                denNgay.max = lastDay;
+                denNgay.value = lastDay;
             }
         });
     }

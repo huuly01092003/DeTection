@@ -157,6 +157,16 @@ class NhanVienReportController {
                 $thang = $available_months[0];
             }
 
+            // ✅ Lấy khoảng ngày thực tế cho tháng đã chọn
+            $range = $date_ranges[$thang] ?? null;
+            if ($range) {
+                $tu_ngay = $range['min_date'];
+                $den_ngay = $range['max_date'];
+            } else {
+                $tu_ngay = $thang . '-01';
+                $den_ngay = date('Y-m-t', strtotime($tu_ngay));
+            }
+
             // ✅ Tính toán số tháng lịch sử tối đa dựa trên tháng đang chọn
             // Trong available_months, các tháng được sắp xếp DESC (mới nhất lên đầu)
             // Ví dụ: [12, 11, 10, 09]. Nếu chọn 11 (index 1), history tối đa là count-1-1 = 2 (10, 09)
