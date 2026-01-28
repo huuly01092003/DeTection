@@ -268,14 +268,14 @@ $isViewer = isViewer();
                 </div>
             <?php else: ?>
                 <!-- ✅ Nav Tabs -->
-                <ul class="nav nav-tabs mb-4" id="reportTabs" role="tablist">
+                <ul class="nav nav-tabs mb-4 " id="reportTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="table-tab" data-bs-toggle="tab" data-bs-target="#table-pane" type="button" role="tab" aria-controls="table-pane" aria-selected="true">
+                        <button class="nav-link active bg-warning" id="table-tab" data-bs-toggle="tab" data-bs-target="#table-pane" type="button" role="tab" aria-controls="table-pane" aria-selected="true" style="border-radius: 10px">
                             <i class="fas fa-table me-2"></i>Bảng Dữ Liệu
                         </button>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="chart-tab" data-bs-toggle="tab" data-bs-target="#chart-pane" type="button" role="tab" aria-controls="chart-pane" aria-selected="false" onclick="renderRevenueCharts()">
+                    <li class="nav-item bg-warning" role="presentation" style="border-radius: 10px">
+                        <button class="nav-link" id="chart-tab" data-bs-toggle="tab" data-bs-target="#chart-pane" type="button" role="tab" aria-controls="chart-pane" aria-selected="false" onclick="renderRevenueCharts()" >
                             <i class="fas fa-chart-line me-2"></i>Biểu Đồ So Sánh
                         </button>
                     </li>
@@ -511,7 +511,7 @@ $isViewer = isViewer();
                             <div class="col-md-12 mb-4">
                                 <div class="card shadow-sm">
                                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                                        <h5 class="mb-0 text-primary"><i class="fas fa-chart-bar me-2"></i>So Sánh Dữ Liệu Các Tháng</h5>
+                                        <h5 class="mb-0 text-black"><i class="fas fa-chart-bar me-2"></i>So Sánh Dữ Liệu Các Tháng</h5>
                                         <div class="d-flex gap-2 align-items-center">
                                             <div class="input-group input-group-sm" style="width: auto;">
                                                 <span class="input-group-text"><i class="fas fa-list-ol"></i> Hiển thị</span>
