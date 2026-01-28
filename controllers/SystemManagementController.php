@@ -61,14 +61,15 @@ class SystemManagementController {
         
         // Get table statistics
         $tables = [
-            'orderdetail' => 'Order Detail',
-            'dskh' => 'Danh Sách Khách Hàng',
-            'gkhl' => 'Gắn Kết Hoa Linh',
-            'summary_anomaly_results' => 'Kết Quả Phát Hiện BT',
-            'summary_report_cache' => 'Cache Báo Cáo',
-            'summary_nhanvien_report_cache' => 'Cache Báo Cáo NV',
-            'summary_nhanvien_kpi_cache' => 'Cache KPI NV'
-        ];
+        'dsnv' => 'Danh Sách Nhân Viên', // Thêm dòng này
+        'orderdetail' => 'Order Detail',
+        'dskh' => 'Danh Sách Khách Hàng',
+        'gkhl' => 'Gắn Kết Hoa Linh',
+        'summary_anomaly_results' => 'Kết Quả Phát Hiện BT',
+        'summary_report_cache' => 'Cache Báo Cáo',
+        'summary_nhanvien_report_cache' => 'Cache Báo Cáo NV',
+        'summary_nhanvien_kpi_cache' => 'Cache KPI NV'
+    ];
         
         foreach ($tables as $table => $name) {
             $stats['tables'][$table] = [
@@ -134,12 +135,13 @@ class SystemManagementController {
         
         $table = $_POST['table'] ?? '';
         $allowedTables = [
-            'orderdetail', 'dskh', 'gkhl', 
-            'summary_anomaly_results', 
-            'summary_report_cache',
-            'summary_nhanvien_report_cache',
-            'summary_nhanvien_kpi_cache'
-        ];
+        'dsnv', // Thêm dòng này
+        'orderdetail', 'dskh', 'gkhl', 
+        'summary_anomaly_results', 
+        'summary_report_cache',
+        'summary_nhanvien_report_cache',
+        'summary_nhanvien_kpi_cache'
+    ];
         
         if (!in_array($table, $allowedTables)) {
             echo json_encode(['success' => false, 'error' => 'Bảng không hợp lệ']);
@@ -181,12 +183,13 @@ class SystemManagementController {
         $day = isset($_POST['day']) ? (int)$_POST['day'] : null;
         
         $allowedTables = [
-            'orderdetail' => 'OrderDate',
-            'summary_anomaly_results' => 'calculated_at',
-            'summary_report_cache' => 'calculated_at',
-            'summary_nhanvien_report_cache' => 'calculated_at',
-            'summary_nhanvien_kpi_cache' => 'calculated_at'
-        ];
+        'dsnv' => 'ngay_vao_cty', // Thêm dòng này: Xóa dựa trên ngày vào công ty
+        'orderdetail' => 'OrderDate',
+        'summary_anomaly_results' => 'calculated_at',
+        'summary_report_cache' => 'calculated_at',
+        'summary_nhanvien_report_cache' => 'calculated_at',
+        'summary_nhanvien_kpi_cache' => 'calculated_at'
+    ];
         
         if (!isset($allowedTables[$table])) {
             echo json_encode(['success' => false, 'error' => 'Bảng không hỗ trợ xóa theo ngày']);

@@ -21,6 +21,11 @@ switch ($action) {
         // Lấy chi tiết đơn hàng nhân viên (AJAX)
         $controller->getEmployeeOrders();
         break;
+    
+    case 'get_daily_sales':
+        // Lấy dữ liệu doanh số theo ngày cho biểu đồ (AJAX)
+        $controller->getDailySalesChart();
+        break;
         
     case 'report':
     default:

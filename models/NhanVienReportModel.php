@@ -17,6 +17,12 @@ class NhanVienReportModel {
     public function __construct() {
         $database = new Database();
         $this->conn = $database->getConnection();
+        
+        // ✅ Enable emulation for multiple uses of the same named parameter
+        if ($this->conn) {
+            $this->conn->setAttribute(PDO::ATTR_EMULATE_PREPARES, true);
+        }
+        
         $this->connectRedis();
     }
     
@@ -38,8 +44,8 @@ class NhanVienReportModel {
      * ✅ LẤY TẤT CẢ NHÂN VIÊN - WITH REDIS CACHE + DB BACKUP
      */
     public function getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang) {
-        // 1️⃣ Tạo cache key
-        $cacheKey = $this->generateCacheKey('employees', $thang, $tu_ngay, $den_ngay);
+        // 1️⃣ Tạo cache key (v2 to force refresh)
+        $cacheKey = $this->generateCacheKey('employees_v2', $thang, $tu_ngay, $den_ngay);
         
         // 2️⃣ Thử lấy từ Redis
         if ($this->redis) {
@@ -67,28 +73,52 @@ class NhanVienReportModel {
                     o.DSRCode,
                     o.DSRTypeProvince,
                     
-                    MAX(nv_info.TenNVBH) as ten_nhan_vien,
-                    MAX(nv_info.MaGSBH) as ma_gsbh,
+                    MAX(nv_info.ho_ten) as ten_nhan_vien,
+                    MAX(nv_info.bo_phan) as bo_phan,
+                    MAX(nv_info.chuc_vu) as chuc_vu,
+                    MAX(nv_info.base_tinh) as base_tinh,
+                    MAX(nv_info.khu_vuc) as khu_vuc,
+                    MAX(nv_info.kenh_ban_hang) as kenh_ban_hang,
+                    MAX(nv_info.trang_thai) as trang_thai,
+                    MAX(nv_info.ma_nv_ql) as ma_nv_ql,
+                    MAX(nv_info.ten_nv_ql) as ten_nv_ql,
+                    MAX(nv_info.ngay_vao_cty) as ngay_vao_cty,
                     
-                    SUM(CASE WHEN DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ? 
+                    SUM(CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay 
                         THEN o.TotalNetAmount ELSE 0 END) as ds_tien_do,
-                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ? 
+                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay 
+                        THEN o.OrderNumber END) as so_don_khoang,
+                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay 
+                        THEN o.CustCode END) as so_kh_khoang,
+                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay 
                         THEN DATE(o.OrderDate) END) as so_ngay_co_doanh_so_khoang,
                     COALESCE(MAX(ds_khoang.max_daily), 0) as ds_ngay_cao_nhat_nv_khoang,
                     
-                    SUM(CASE WHEN o.RptYear = ? AND o.RptMonth = ? 
+                    SUM(CASE WHEN o.RptYear = :year AND o.RptMonth = :month 
                         THEN o.TotalNetAmount ELSE 0 END) as ds_tong_thang_nv,
-                    COUNT(DISTINCT CASE WHEN o.RptYear = ? AND o.RptMonth = ? 
+                    COUNT(DISTINCT CASE WHEN o.RptYear = :year AND o.RptMonth = :month 
+                        THEN o.OrderNumber END) as so_don_thang,
+                    COUNT(DISTINCT CASE WHEN o.RptYear = :year AND o.RptMonth = :month 
+                        THEN o.CustCode END) as so_kh_thang,
+                    COUNT(DISTINCT CASE WHEN o.RptYear = :year AND o.RptMonth = :month 
                         THEN DATE(o.OrderDate) END) as so_ngay_co_doanh_so_thang,
-                    COALESCE(MAX(ds_thang.max_daily), 0) as ds_ngay_cao_nhat_nv_thang
+                    COALESCE(MAX(ds_thang.max_daily), 0) as ds_ngay_cao_nhat_nv_thang,
+
+                    -- MỚI: Doanh số khách hàng lớn nhất trong khoảng
+                    COALESCE(MAX(ds_kh_khoang.max_cust_amount), 0) as ds_kh_lon_nhat_khoang,
+                    
+                    -- MỚI: Doanh số từ khách hàng GKHL (Gắn kết Hoa Linh)
+                    SUM(CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay AND g.MaKHDMS IS NOT NULL 
+                        THEN o.TotalNetAmount ELSE 0 END) as ds_gkhl_khoang,
+                        
+                    -- MỚI: Số khách hàng GKHL phát sinh đơn trong khoảng
+                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay AND g.MaKHDMS IS NOT NULL 
+                        THEN o.CustCode END) as so_kh_gkhl_khoang
                     
                 FROM orderdetail o
                 
-                LEFT JOIN (
-                    SELECT DISTINCT MaNVBH, TenNVBH, MaGSBH
-                    FROM dskh
-                    WHERE MaNVBH IS NOT NULL AND MaNVBH != ''
-                ) nv_info ON o.DSRCode = nv_info.MaNVBH
+                LEFT JOIN dsnv nv_info ON o.DSRCode = nv_info.ma_nv
+                LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
                 
                 LEFT JOIN (
                     SELECT 
@@ -101,9 +131,8 @@ class NhanVienReportModel {
                             SUM(TotalNetAmount) as daily_amount
                         FROM orderdetail
                         WHERE DSRCode IS NOT NULL 
-                        AND DSRCode != ''
-                        AND DATE(OrderDate) >= ?
-                        AND DATE(OrderDate) <= ?
+                        AND DATE(OrderDate) >= :tu_ngay
+                        AND DATE(OrderDate) <= :den_ngay
                         GROUP BY DSRCode, DATE(OrderDate)
                     ) daily_khoang
                     GROUP BY DSRCode
@@ -120,19 +149,35 @@ class NhanVienReportModel {
                             SUM(TotalNetAmount) as daily_amount
                         FROM orderdetail
                         WHERE DSRCode IS NOT NULL 
-                        AND DSRCode != ''
-                        AND RptYear = ?
-                        AND RptMonth = ?
+                        AND RptYear = :year
+                        AND RptMonth = :month
                         GROUP BY DSRCode, DATE(OrderDate)
                     ) daily_thang
                     GROUP BY DSRCode
                 ) ds_thang ON o.DSRCode = ds_thang.DSRCode
+
+                -- Subquery lấy doanh số khách hàng lớn nhất
+                LEFT JOIN (
+                    SELECT 
+                        DSRCode,
+                        MAX(cust_amount) as max_cust_amount
+                    FROM (
+                        SELECT 
+                            DSRCode,
+                            CustCode,
+                            SUM(TotalNetAmount) as cust_amount
+                        FROM orderdetail
+                        WHERE DATE(OrderDate) >= :tu_ngay AND DATE(OrderDate) <= :den_ngay
+                        GROUP BY DSRCode, CustCode
+                    ) cust_khoang
+                    GROUP BY DSRCode
+                ) ds_kh_khoang ON o.DSRCode = ds_kh_khoang.DSRCode
                 
                 WHERE o.DSRCode IS NOT NULL 
                 AND o.DSRCode != ''
                 AND (
-                    (DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ?)
-                    OR (o.RptYear = ? AND o.RptMonth = ?)
+                    (DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay)
+                    OR (o.RptYear = :year AND o.RptMonth = :month)
                 )
                 GROUP BY o.DSRCode, o.DSRTypeProvince
                 HAVING ds_tien_do > 0 OR ds_tong_thang_nv > 0
@@ -140,14 +185,10 @@ class NhanVienReportModel {
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
-            $tu_ngay, $den_ngay,
-            $tu_ngay, $den_ngay,
-            $year, $month,
-            $year, $month,
-            $tu_ngay, $den_ngay,
-            $year, $month,
-            $tu_ngay, $den_ngay,
-            $year, $month
+            'tu_ngay' => $tu_ngay,
+            'den_ngay' => $den_ngay,
+            'year' => $year,
+            'month' => $month
         ]);
         
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -193,14 +234,34 @@ class NhanVienReportModel {
         $sql = "SELECT 
                     COALESCE(SUM(o.TotalNetAmount), 0) as total,
                     COUNT(DISTINCT o.DSRCode) as emp_count,
-                    DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) as so_ngay,
+                    DATEDIFF(MAX(DATE(o.OrderDate)), MIN(DATE(o.OrderDate))) + 1 as so_ngay,
                     
+                    COUNT(DISTINCT o.OrderNumber) as order_count,
+                    COUNT(DISTINCT o.CustCode) as cust_count,
+
+                    -- Doanh số TB ngày / NV
                     COALESCE(SUM(o.TotalNetAmount), 0) / 
-                    NULLIF(COUNT(DISTINCT o.DSRCode) * DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))), 0) as ds_tb_chung_thang,
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(MAX(DATE(o.OrderDate)), MIN(DATE(o.OrderDate))) + 1), 0) as ds_tb_chung_thang,
                     
+                    -- AOV TB
+                    COALESCE(SUM(o.TotalNetAmount), 0) / NULLIF(COUNT(DISTINCT o.OrderNumber), 0) as aov_thang,
+
+                    -- Số đơn TB ngày / NV
+                    COUNT(DISTINCT o.OrderNumber) / 
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(MAX(DATE(o.OrderDate)), MIN(DATE(o.OrderDate))) + 1), 0) as orders_per_day_thang,
+
+                    -- Số khách TB ngày / NV
+                    COUNT(DISTINCT o.CustCode) / 
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(MAX(DATE(o.OrderDate)), MIN(DATE(o.OrderDate))) + 1), 0) as cust_per_day_thang,
+                    
+                    -- Tỷ lệ khách hàng GKHL của hệ thống
+                    COUNT(DISTINCT CASE WHEN g.MaKHDMS IS NOT NULL THEN o.CustCode END) / 
+                    NULLIF(COUNT(DISTINCT o.CustCode), 0) as gkhl_rate_thang,
+
                     AVG(emp_max.max_daily) as ds_ngay_cao_nhat_tb_thang
                     
                 FROM orderdetail o
+                LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
                 LEFT JOIN (
                     SELECT 
                         DSRCode, 
@@ -211,17 +272,17 @@ class NhanVienReportModel {
                             DATE(OrderDate) as order_date,
                             SUM(TotalNetAmount) as daily_total
                         FROM orderdetail
-                        WHERE RptYear = ? AND RptMonth = ?
+                        WHERE RptYear = :year AND RptMonth = :month
                         AND DSRCode IS NOT NULL AND DSRCode != ''
                         GROUP BY DSRCode, DATE(OrderDate)
                     ) daily
                     GROUP BY DSRCode
                 ) emp_max ON o.DSRCode = emp_max.DSRCode
-                WHERE o.RptYear = ? AND o.RptMonth = ?
+                WHERE o.RptYear = :year AND o.RptMonth = :month
                 AND o.DSRCode IS NOT NULL AND o.DSRCode != ''";
         
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([$year, $month, $year, $month, $year, $month, $year, $month]);
+        $stmt->execute(['year' => $year, 'month' => $month]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Lưu vào cache
@@ -261,14 +322,34 @@ class NhanVienReportModel {
         $sql = "SELECT 
                     COALESCE(SUM(o.TotalNetAmount), 0) as total,
                     COUNT(DISTINCT o.DSRCode) as emp_count,
-                    DATEDIFF(?, ?) + 1 as so_ngay,
+                    DATEDIFF(:den_ngay, :tu_ngay) + 1 as so_ngay,
                     
+                    COUNT(DISTINCT o.OrderNumber) as order_count,
+                    COUNT(DISTINCT o.CustCode) as cust_count,
+
+                    -- Doanh số TB ngày / NV
                     COALESCE(SUM(o.TotalNetAmount), 0) / 
-                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(?, ?) + 1), 0) as ds_tb_chung_khoang,
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(:den_ngay, :tu_ngay) + 1), 0) as ds_tb_chung_khoang,
+                    
+                    -- AOV TB
+                    COALESCE(SUM(o.TotalNetAmount), 0) / NULLIF(COUNT(DISTINCT o.OrderNumber), 0) as aov_khoang,
+
+                    -- Số đơn TB ngày / NV
+                    COUNT(DISTINCT o.OrderNumber) / 
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(:den_ngay, :tu_ngay) + 1), 0) as orders_per_day_khoang,
+
+                    -- Số khách TB ngày / NV
+                    COUNT(DISTINCT o.CustCode) / 
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(:den_ngay, :tu_ngay) + 1), 0) as cust_per_day_khoang,
+
+                    -- Tỷ lệ khách hàng GKHL của hệ thống
+                    COUNT(DISTINCT CASE WHEN g.MaKHDMS IS NOT NULL THEN o.CustCode END) / 
+                    NULLIF(COUNT(DISTINCT o.CustCode), 0) as gkhl_rate_khoang,
                     
                     AVG(emp_max.max_daily) as ds_ngay_cao_nhat_tb_khoang
                     
                 FROM orderdetail o
+                LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
                 LEFT JOIN (
                     SELECT 
                         DSRCode, 
@@ -279,21 +360,19 @@ class NhanVienReportModel {
                             DATE(OrderDate) as order_date,
                             SUM(TotalNetAmount) as daily_total
                         FROM orderdetail
-                        WHERE DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?
+                        WHERE DATE(OrderDate) >= :tu_ngay AND DATE(OrderDate) <= :den_ngay
                         AND DSRCode IS NOT NULL AND DSRCode != ''
                         GROUP BY DSRCode, DATE(OrderDate)
                     ) daily
                     GROUP BY DSRCode
                 ) emp_max ON o.DSRCode = emp_max.DSRCode
-                WHERE DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ?
+                WHERE DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay
                 AND o.DSRCode IS NOT NULL AND o.DSRCode != ''";
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
-            $den_ngay, $tu_ngay,
-            $den_ngay, $tu_ngay,
-            $tu_ngay, $den_ngay,
-            $tu_ngay, $den_ngay
+            'tu_ngay' => $tu_ngay,
+            'den_ngay' => $den_ngay
         ]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -349,15 +428,13 @@ class NhanVienReportModel {
             
             if ($dataType === 'employees' && is_array($data)) {
                 $employeeCount = count($data);
-                // Suspect: nhân viên có doanh số cao bất thường
                 foreach ($data as $emp) {
-                    $avgDaily = isset($emp['so_ngay_co_doanh_so_khoang']) && $emp['so_ngay_co_doanh_so_khoang'] > 0
-                        ? $emp['ds_tien_do'] / $emp['so_ngay_co_doanh_so_khoang']
-                        : 0;
-                    $maxDaily = $emp['ds_ngay_cao_nhat_nv_khoang'] ?? 0;
+                    $ds_tien_do = $emp['ds_tien_do'] ?? 0;
+                    $ds_tong_thang = $emp['ds_tong_thang_nv'] ?? 1;
+                    $ty_le_tien_do = ($ds_tong_thang > 0) ? ($ds_tien_do / $ds_tong_thang) : 0;
                     
-                    // Đánh dấu suspect nếu doanh số ngày cao nhất > 3x trung bình
-                    if ($maxDaily > $avgDaily * 3 && $avgDaily > 0) {
+                    // Chỉ đếm là nghi vấn nếu tiến độ > 50% tháng (để lưu stats tổng quát)
+                    if ($ty_le_tien_do > 0.5) {
                         $suspectCount++;
                     }
                 }
@@ -408,24 +485,40 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ CHI TIẾT ĐƠN HÀNG NHÂN VIÊN
+     * ✅ CHI TIẾT ĐƠN HÀNG NHÂN VIÊN - BẢN CẢI TIẾN
+     * Bao gồm: thông tin KH từ dskh, trạng thái GKHL, ProductCode, ProductSaleType
      */
     public function getEmployeeOrderDetails($dsr_code, $tu_ngay, $den_ngay) {
         $sql = "SELECT 
                     o.OrderNumber as ma_don,
                     o.OrderDate as ngay_dat,
                     o.CustCode as ma_kh,
+                    o.ProductCode as ma_san_pham,
+                    o.ProductSaleType as loai_ban,
+                    o.TotalNetAmount as so_tien,
+                    o.Qty as so_luong,
+                    
+                    -- Thông tin khách hàng từ dskh
                     COALESCE(d.TenKH, 'N/A') as ten_kh,
+                    COALESCE(d.MaSoThue, '') as ma_so_thue,
+                    COALESCE(d.PhanLoaiNhomKH, '') as phan_loai_nhom_kh,
+                    COALESCE(d.LoaiKH, '') as loai_kh,
                     COALESCE(d.DiaChi, '') as dia_chi_kh,
                     COALESCE(d.Tinh, '') as tinh_kh,
-                    o.TotalNetAmount as so_tien,
-                    o.Qty as so_luong
+                    
+                    -- Trạng thái gắn kết Hoa Linh từ gkhl
+                    CASE WHEN g.MaKHDMS IS NOT NULL THEN 'Y' ELSE 'N' END as gkhl_status,
+                    COALESCE(g.DangKyChuongTrinh, '') as dang_ky_chuong_trinh,
+                    COALESCE(g.DangKyMucDoanhSo, '') as dang_ky_muc_doanh_so,
+                    COALESCE(g.DangKyTrungBay, '') as dang_ky_trung_bay
+                    
                 FROM orderdetail o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
+                LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
                 WHERE o.DSRCode = ?
                 AND DATE(o.OrderDate) >= ?
                 AND DATE(o.OrderDate) <= ?
-                ORDER BY o.OrderDate DESC, o.OrderNumber DESC";
+                ORDER BY o.OrderDate DESC, o.OrderNumber DESC, o.ProductCode";
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([$dsr_code, $tu_ngay, $den_ngay]);
@@ -514,6 +607,35 @@ class NhanVienReportModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
+    /**
+     * ✅ LẤY KHOẢNG NGÀY THỰC TẾ CHO MỖI KỲ BÁO CÁO
+     * Thay vì dùng ngày theo lịch (1-31), lấy MIN/MAX OrderDate từ database
+     * @return array ['2025-12' => ['min_date' => '2025-11-28', 'max_date' => '2025-12-28'], ...]
+     */
+    public function getActualDateRanges() {
+        $sql = "SELECT 
+                    CONCAT(RptYear, '-', LPAD(RptMonth, 2, '0')) as thang,
+                    MIN(DATE(OrderDate)) as min_date,
+                    MAX(DATE(OrderDate)) as max_date
+                FROM orderdetail
+                WHERE RptYear IS NOT NULL AND RptMonth IS NOT NULL
+                AND RptYear >= 2020
+                GROUP BY RptYear, RptMonth
+                ORDER BY RptYear DESC, RptMonth DESC
+                LIMIT 24";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        $results = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $results[$row['thang']] = [
+                'min_date' => $row['min_date'],
+                'max_date' => $row['max_date']
+            ];
+        }
+        return $results;
+    }
+
     public function getTotalByMonth($thang) {
         list($year, $month) = explode('-', $thang);
         $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
@@ -529,6 +651,104 @@ class NhanVienReportModel {
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([$tu_ngay, $den_ngay]);
         return floatval($stmt->fetch()['total'] ?? 0);
+    }
+
+    /**
+     * ✅ LẤY DOANH SỐ THEO NGÀY CHO BIỂU ĐỒ PHÂN TÍCH
+     * Trả về dữ liệu: [{ dsr_code, ten_nv, ngay, doanh_so, so_don }]
+     */
+    public function getDailySalesForChart($tu_ngay, $den_ngay, $thang = null) {
+        // Thử lấy từ Redis cache trước
+        $cacheKey = "nhanvien:daily_sales:{$tu_ngay}:{$den_ngay}";
+        
+        if ($this->redis) {
+            try {
+                $cached = $this->redis->get($cacheKey);
+                if ($cached) {
+                    return json_decode($cached, true);
+                }
+            } catch (Exception $e) {
+                error_log("Redis get error: " . $e->getMessage());
+            }
+        }
+
+        $sql = "SELECT 
+                    o.DSRCode as dsr_code,
+                    COALESCE(nv.ho_ten, CONCAT('NV_', o.DSRCode)) as ten_nv,
+                    DATE(o.OrderDate) as ngay,
+                    SUM(o.TotalNetAmount) as doanh_so,
+                    COUNT(DISTINCT o.OrderNumber) as so_don,
+                    COUNT(DISTINCT o.CustCode) as so_kh
+                FROM orderdetail o
+                LEFT JOIN dsnv nv ON o.DSRCode = nv.ma_nv
+                WHERE DATE(o.OrderDate) >= :tu_ngay 
+                AND DATE(o.OrderDate) <= :den_ngay
+                AND o.DSRCode IS NOT NULL 
+                AND o.DSRCode != ''
+                GROUP BY o.DSRCode, nv.ho_ten, DATE(o.OrderDate)
+                ORDER BY o.DSRCode, DATE(o.OrderDate)";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            'tu_ngay' => $tu_ngay,
+            'den_ngay' => $den_ngay
+        ]);
+        
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Lưu vào Redis cache (TTL 30 phút)
+        if ($this->redis && !empty($results)) {
+            try {
+                $this->redis->setex($cacheKey, 1800, json_encode($results, JSON_UNESCAPED_UNICODE));
+            } catch (Exception $e) {
+                error_log("Redis set error: " . $e->getMessage());
+            }
+        }
+        
+        return $results;
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH TOP NHÂN VIÊN NGHI VẤN (dựa trên tỷ lệ tiến độ cao)
+     * Dùng cho biểu đồ tập trung vào NV bất thường
+     */
+    public function getTopSuspectEmployees($tu_ngay, $den_ngay, $thang, $limit = 20) {
+        list($year, $month) = explode('-', $thang);
+        
+        $sql = "SELECT 
+                    o.DSRCode as dsr_code,
+                    COALESCE(nv.ho_ten, CONCAT('NV_', o.DSRCode)) as ten_nv,
+                    
+                    SUM(CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay 
+                        THEN o.TotalNetAmount ELSE 0 END) as ds_khoang,
+                    
+                    SUM(CASE WHEN o.RptYear = :year AND o.RptMonth = :month 
+                        THEN o.TotalNetAmount ELSE 0 END) as ds_thang,
+                        
+                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay 
+                        THEN DATE(o.OrderDate) END) as so_ngay_hoat_dong
+                        
+                FROM orderdetail o
+                LEFT JOIN dsnv nv ON o.DSRCode = nv.ma_nv
+                WHERE o.DSRCode IS NOT NULL AND o.DSRCode != ''
+                AND (
+                    (DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay)
+                    OR (o.RptYear = :year AND o.RptMonth = :month)
+                )
+                GROUP BY o.DSRCode, nv.ho_ten
+                HAVING ds_khoang > 0
+                ORDER BY (ds_khoang / NULLIF(ds_thang, 0)) DESC, ds_khoang DESC
+                LIMIT :limit";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindValue(':tu_ngay', $tu_ngay, PDO::PARAM_STR);
+        $stmt->bindValue(':den_ngay', $den_ngay, PDO::PARAM_STR);
+        $stmt->bindValue(':year', $year, PDO::PARAM_STR);
+        $stmt->bindValue(':month', $month, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 ?>

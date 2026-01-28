@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 30, 2025 at 02:09 AM
+-- Generation Time: Jan 27, 2026 at 05:28 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -42,6 +42,29 @@ CREATE TABLE `dskh` (
   `Tinh` varchar(100) DEFAULT NULL,
   `Location` varchar(255) DEFAULT NULL,
   `MaSoThue` varchar(50) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `dsnv`
+--
+
+CREATE TABLE `dsnv` (
+  `ma_nv` varchar(20) NOT NULL,
+  `ho_ten` varchar(100) NOT NULL,
+  `gioi_tinh` varchar(10) DEFAULT NULL,
+  `ngay_sinh` date DEFAULT NULL,
+  `sdt_ca_nhan` varchar(20) DEFAULT NULL,
+  `bo_phan` varchar(100) DEFAULT NULL,
+  `chuc_vu` varchar(100) DEFAULT NULL,
+  `base_tinh` varchar(100) DEFAULT NULL,
+  `khu_vuc` varchar(100) DEFAULT NULL,
+  `kenh_ban_hang` varchar(100) DEFAULT NULL,
+  `ngay_vao_cty` date DEFAULT NULL,
+  `trang_thai` varchar(50) DEFAULT NULL,
+  `ma_nv_ql` varchar(20) DEFAULT NULL,
+  `ten_nv_ql` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -277,7 +300,15 @@ ALTER TABLE `dskh`
   ADD KEY `idx_loai_kh` (`LoaiKH`),
   ADD KEY `idx_tinh_quan` (`Tinh`,`QuanHuyen`),
   ADD KEY `idx_ma_nvbh` (`MaNVBH`),
-  ADD KEY `idx_ma_gsbh` (`MaGSBH`);
+  ADD KEY `idx_ma_gsbh` (`MaGSBH`),
+  ADD KEY `idx_customer_lookup` (`MaKH`,`TenKH`,`Tinh`,`DiaChi`,`LoaiKH`),
+  ADD KEY `idx_customer_info` (`MaKH`,`TenKH`,`Tinh`);
+
+--
+-- Indexes for table `dsnv`
+--
+ALTER TABLE `dsnv`
+  ADD PRIMARY KEY (`ma_nv`);
 
 --
 -- Indexes for table `gkhl`
@@ -289,7 +320,8 @@ ALTER TABLE `gkhl`
   ADD KEY `idx_ma_kh_dms` (`MaKHDMS`),
   ADD KEY `idx_ma_nvbh` (`MaNVBH`),
   ADD KEY `idx_khop_sdt` (`KhopSDT`),
-  ADD KEY `idx_nam_sinh` (`NamSinh`);
+  ADD KEY `idx_nam_sinh` (`NamSinh`),
+  ADD KEY `idx_gkhl_customer` (`MaKHDMS`);
 
 --
 -- Indexes for table `login_history`
@@ -316,7 +348,8 @@ ALTER TABLE `orderdetail`
   ADD KEY `idx_anomaly_detection` (`CustCode`,`RptYear`,`RptMonth`,`OrderDate`,`TotalNetAmount`),
   ADD KEY `idx_product_code` (`CustCode`,`ProductCode`(2),`RptYear`,`RptMonth`),
   ADD KEY `idx_product_analysis` (`CustCode`,`ProductCode`,`RptYear`,`RptMonth`),
-  ADD KEY `idx_date_range` (`OrderDate`,`CustCode`,`TotalNetAmount`);
+  ADD KEY `idx_date_range` (`OrderDate`,`CustCode`,`TotalNetAmount`),
+  ADD KEY `idx_fast_summary` (`RptYear`,`RptMonth`,`CustCode`,`TotalNetAmount`,`Qty`,`TotalGrossAmount`,`TotalSchemeAmount`);
 
 --
 -- Indexes for table `role_switch_log`

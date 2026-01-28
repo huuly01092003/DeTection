@@ -59,6 +59,12 @@ function renderEnhancedNavbar($currentPage = '', $additionalInfo = []) {
                                 <i class="fas fa-handshake me-2"></i>Gắn Kết Hoa Linh
                             </a>
                         </li>
+                        <li>
+                            <a class="dropdown-item <?= $baseName === 'dsnv' && !isset($_GET['action']) ? 'active' : '' ?>" 
+                               href="dsnv.php">
+                                <i class="fas fa-file-csv me-2"></i>Danh sách nhân viên
+                            </a>
+                        </li>
                     </ul>
                 </li>
 
@@ -101,6 +107,11 @@ function renderEnhancedNavbar($currentPage = '', $additionalInfo = []) {
                         <li>
                             <a class="dropdown-item" href="gkhl.php?action=list">
                                 <i class="fas fa-list me-2"></i>Xem GKHL
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="dsnv.php?action=list">
+                                <i class="fas fa-list me-2"></i>Xem DSNV
                             </a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
