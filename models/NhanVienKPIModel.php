@@ -207,7 +207,7 @@ class NhanVienKPIModel {
             ];
             
             // Phân tích risk nâng cao
-            $row['risk_analysis'] = $this->analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates, $daily_amounts);
+            $row['risk_analysis'] = $this->analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates, $daily_amounts, $daily_orders);
             $row['risk_score'] = $row['risk_analysis']['risk_score'];
             $row['risk_level'] = $row['risk_analysis']['risk_level'];
             $row['violation_days'] = $row['risk_analysis']['violation_days'];
@@ -310,7 +310,7 @@ class NhanVienKPIModel {
      * 3. Efficiency Decline: Doanh số TB/khách thấp bất thường vào ngày có nhiều khách (Filler orders).
      * 4. Consecutive Violations: Vi phạm liên tiếp.
      */
-    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = []) {
+    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = [], $daily_orders = []) {
         $total_days = count($daily_customers);
         if ($total_days < 3) return $this->emptyRiskResult();
 
@@ -331,49 +331,59 @@ class NhanVienKPIModel {
         $baseline_aov = $this->calculateMedian($temp_aovs);
 
         $violation_days = [];
+        $suspicious_indices = []; // Track any day with suspicious behavior for streak
         $violation_count = 0;
         $max_excess_ratio = 0;
 
         foreach ($daily_customers as $idx => $count) {
-            // A. Modified Z-Score (Robust Anomaly)
-            $z_score = $mad > 0 ? 0.6745 * ($count - $median) / $mad : ($count > $median ? 10 : 0);
-            
-            $is_statistical_anomaly = ($z_score > 3.5);
-            $is_threshold_violation = ($count > $adaptive_n);
-            
             $day_amount = $daily_amounts[$idx] ?? 0;
             $day_aov = $count > 0 ? ($day_amount / $count) : 0;
             
-            // B. Efficiency Drop (Nghi vấn chẻ nhỏ đơn hàng)
-            $is_efficiency_drop = ($count > $median && $day_aov < ($baseline_aov * 0.3));
+            // 1. Phân loại hành vi
+            $is_threshold_violation = ($count > $adaptive_n);
+            $is_splitting = ($count > $median * 1.3 && $day_aov < $baseline_aov * 0.4);
+            $is_consolidation = ($day_aov > $baseline_aov * 2.5 && $count < $median * 0.7 && $count > 0);
+            
+            // 2. Phát hiện xen kẽ (So với ngày hôm trước) - Biến động cực lớn
+            $is_alternating = false;
+            if ($idx > 0) {
+                $prev_count = $daily_customers[$idx-1];
+                if (abs($count - $prev_count) > ($median * 1.2)) {
+                    $is_alternating = true;
+                }
+            }
 
-            if ($is_threshold_violation || $is_statistical_anomaly || $is_efficiency_drop) {
+            if ($is_threshold_violation || $is_splitting || $is_consolidation || $is_alternating) {
                 $reasons = [];
                 if ($count > $adaptive_n * 2) $reasons[] = "Vượt ngưỡng đột xuất (Gấp 2)";
                 elseif ($is_threshold_violation) $reasons[] = "Vượt ngưỡng thích ứng (N=" . $adaptive_n . ")";
                 
-                if ($is_statistical_anomaly) $reasons[] = "Bất thường thống kê (Robust)";
-                if ($is_efficiency_drop) $reasons[] = "Nghi vấn chẻ đơn (AOV thấp)";
+                if ($is_splitting) $reasons[] = "Nghi vấn chẻ đơn (AOV thấp)";
+                if ($is_consolidation) $reasons[] = "Nghi vấn gộp đơn (AOV cao)";
+                if ($is_alternating) $reasons[] = "Dấu hiệu xen kẽ (Biến động)";
 
                 if ($is_threshold_violation) $violation_count++;
+                $suspicious_indices[] = $idx;
                 
                 $max_excess_ratio = max($max_excess_ratio, $count / max(1, $adaptive_n));
 
                 $violation_days[] = [
                     'date' => $daily_dates[$idx] ?? "Ngày $idx",
                     'customers' => $count,
+                    'orders' => $daily_orders[$idx] ?? 0,
                     'threshold' => $adaptive_n,
-                    'z_score' => round($z_score, 1),
-                    'day_aov' => $day_amount / max(1, $count),
+                    'z_score' => 0, 
+                    'day_aov' => $day_aov,
                     'baseline_aov' => $baseline_aov,
+                    'total_amount' => $day_amount,
                     'reasons' => $reasons,
-                    'is_critical' => ($is_threshold_violation && $is_statistical_anomaly)
+                    'is_critical' => $is_threshold_violation && ($count > $adaptive_n * 1.5)
                 ];
             }
         }
 
         // 2. TÍNH ĐIỂM RISK (0-100)
-        $risk_scores = ['threshold' => 0, 'statistical' => 0, 'efficiency' => 0, 'consecutive' => 0];
+        $risk_scores = ['threshold' => 0, 'behavioral' => 0, 'consecutive' => 0];
 
         // A. Điểm vượt ngưỡng (Max 50đ)
         if ($violation_count > 0) {
@@ -383,35 +393,47 @@ class NhanVienKPIModel {
             else $risk_scores['threshold'] = 20;
         }
 
-        // B. Điểm bất thường thống kê (Max 20đ)
-        $anomalies = array_filter($violation_days, fn($v) => $v['z_score'] > 3.5);
-        if (count($anomalies) > 0) {
-            $risk_scores['statistical'] = min(20, count($anomalies) * 10);
+        // B. Điểm hành vi thao túng (Max 40đ)
+        $behavioral_days = array_filter($violation_days, fn($v) => array_intersect(["Nghi vấn chẻ đơn (AOV thấp)", "Nghi vấn gộp đơn (AOV cao)", "Dấu hiệu xen kẽ (Biến động)"], $v['reasons']));
+        if (count($behavioral_days) > 0) {
+            $risk_scores['behavioral'] = min(40, count($behavioral_days) * 15);
         }
 
-        // C. Điểm hiệu suất (Max 20đ)
-        $efficiency_drops = array_filter($violation_days, fn($v) => in_array("Nghi vấn chẻ đơn (AOV thấp)", $v['reasons']));
-        if (count($efficiency_drops) > 0) {
-            $risk_scores['efficiency'] = min(20, count($efficiency_drops) * 10);
+        // C. Điểm liên tiếp (Max 10đ) - Tính streak dựa trên suspicious_indices
+        $streak = 0;
+        if (!empty($suspicious_indices)) {
+            $current_streak = 1;
+            $max_streak = 1;
+            for ($i = 1; $i < count($suspicious_indices); $i++) {
+                if ($suspicious_indices[$i] == $suspicious_indices[$i-1] + 1) {
+                    $current_streak++;
+                    $max_streak = max($max_streak, $current_streak);
+                } else {
+                    $current_streak = 1;
+                }
+            }
+            $streak = $max_streak;
         }
 
-        // D. Điểm liên tiếp (Max 10đ)
-        $consecutive = $this->countConsecutiveViolations($daily_customers, $adaptive_n);
-        if ($consecutive >= 4) $risk_scores['consecutive'] = 10;
-        elseif ($consecutive >= 3) $risk_scores['consecutive'] = 7;
-        elseif ($consecutive >= 2) $risk_scores['consecutive'] = 3;
+        if ($streak >= 4) $risk_scores['consecutive'] = 10;
+        elseif ($streak >= 3) $risk_scores['consecutive'] = 7;
+        elseif ($streak >= 2) $risk_scores['consecutive'] = 3;
 
         $total_score = min(100, array_sum($risk_scores));
 
         return [
             'risk_score' => $total_score,
             'risk_level' => $total_score >= 80 ? 'critical' : ($total_score >= 40 ? 'warning' : 'normal'),
-            'risk_breakdown' => $risk_scores,
+            'risk_breakdown' => [
+                'threshold' => $risk_scores['threshold'],
+                'efficiency' => $risk_scores['behavioral'], // Ánh xạ lại vào view hiện tại
+                'consecutive' => $risk_scores['consecutive']
+            ],
             'violation_count' => $violation_count,
             'total_days' => $total_days,
             'violation_rate' => round(($violation_count / max(1, $total_days)) * 100, 1),
             'max_violation' => max(0, ceil($max_excess_ratio * $adaptive_n) - $adaptive_n),
-            'consecutive_violations' => $consecutive,
+            'consecutive_violations' => $streak,
             'violation_days' => $violation_days,
             'stats' => [
                 'median_cust' => $median,
@@ -453,13 +475,23 @@ class NhanVienKPIModel {
         return [
             'risk_score' => 0,
             'risk_level' => 'normal',
+            'risk_breakdown' => [
+                'threshold' => 0,
+                'statistical' => 0,
+                'efficiency' => 0,
+                'consecutive' => 0
+            ],
             'violation_count' => 0,
+            'total_days' => 0,
             'violation_rate' => 0,
             'max_violation' => 0,
+            'consecutive_violations' => 0,
             'violation_days' => [],
             'stats' => [
-                'avg_cust' => 0,
-                'std_dev' => 0,
+                'median_cust' => 0,
+                'mad' => 0,
+                'p80' => 0,
+                'adaptive_n' => 5,
                 'baseline_aov' => 0
             ]
         ];

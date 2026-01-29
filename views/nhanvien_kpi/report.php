@@ -471,25 +471,19 @@ function showDetail(data) {
             </div>
             <div class="col-md-9">
                 <div class="row g-2">
-                    <div class="col-3">
+                    <div class="col-4">
                         <div class="p-2 border rounded bg-white text-center shadow-sm">
                             <div class="small text-muted">Vượt Ngưỡng</div>
                             <div class="fw-bold text-danger">${Math.round(rb.threshold)}đ</div>
                         </div>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Bất Thường</div>
-                            <div class="fw-bold text-warning">${Math.round(rb.statistical)}đ</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Hiệu Suất</div>
+                            <div class="small text-muted">Thao Túng</div>
                             <div class="fw-bold text-info">${Math.round(rb.efficiency)}đ</div>
                         </div>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <div class="p-2 border rounded bg-white text-center shadow-sm">
                             <div class="small text-muted">Liên Tiếp</div>
                             <div class="fw-bold text-secondary">${Math.round(rb.consecutive)}đ</div>
@@ -509,8 +503,9 @@ function showDetail(data) {
                         <tr>
                             <th style="width: 40px;"></th>
                             <th>Ngày Phân Tích</th>
-                            <th class="text-end">Khách hàng / Đơn hàng</th>
-                            <th class="text-end">Z-Score</th>
+                            <th class="text-end">Khách hàng</th>
+                            <th class="text-end">Đơn hàng</th>
+                            <th class="text-end">Tổng tiền ngày</th>
                             <th class="text-end">AOV Ngày</th>
                             <th>Lý do rủi ro</th>
                         </tr>
@@ -527,7 +522,8 @@ function showDetail(data) {
                     <td class="text-center"><i class="fas fa-chevron-right expand-icon" id="icon-${index}"></i></td>
                     <td><strong class="text-muted">${v.date}</strong></td>
                     <td class="text-end"><strong>${v.customers}</strong> KH</td>
-                    <td class="text-end"><span class="fw-bold ${zClass}">${v.z_score}</span></td>
+                    <td class="text-end"><strong>${v.orders}</strong> Đơn</td>
+                    <td class="text-end fw-bold text-dark">${formatMoney(v.total_amount)}</td>
                     <td class="text-end fw-bold text-primary">${formatMoney(v.day_aov)}</td>
                     <td>
                         <div class="small">
@@ -536,7 +532,7 @@ function showDetail(data) {
                     </td>
                 </tr>
                 <tr class="detail-sub-row d-none" id="subrow-${index}">
-                    <td colspan="6">
+                    <td colspan="8">
                         <div class="detail-container" id="container-${index}">
                             <div class="text-center py-3">
                                 <div class="spinner-border spinner-border-sm text-primary"></div>
