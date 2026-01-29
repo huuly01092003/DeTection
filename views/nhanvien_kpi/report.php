@@ -637,10 +637,28 @@ function renderInlineCustomers(container, customers) {
     customers.forEach((c, cIdx) => {
         let gkhlHtml = '';
         if (c.is_gkhl == 1) {
+            const cleanLimit = (c.gk_limit || '').replace(/[^0-9]/g, '');
+            const limit = parseFloat(cleanLimit);
+            const progress = c.gkhl_progress || 0;
+            const achievedDate = c.gkhl_achieved_date;
+            
+            let statusHtml = '';
+            if (achievedDate) {
+                statusHtml = `<div class="badge bg-success text-white mt-1"><i class="fas fa-check-circle me-1"></i>Đạt ngày ${achievedDate}</div>`;
+            } else if (progress > 0) {
+                statusHtml = `
+                    <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress-bar ${progress >= 80 ? 'bg-warning' : 'bg-info'}" style="width: ${Math.min(progress, 100)}%"></div>
+                    </div>
+                    <div class="small text-muted mt-1">Tiến độ: ${progress}%</div>
+                `;
+            }
+            
             gkhlHtml = `
                 <div class="mt-2 p-2 rounded bg-warning-subtle border border-warning" style="font-size: 0.75rem;">
                     <div class="fw-bold text-dark"><i class="fas fa-handshake me-1"></i>Đăng ký GKHL:</div>
                     <div class="text-muted">${escapeHtml(c.gkhl_types)}</div>
+                    ${statusHtml}
                 </div>
             `;
         }

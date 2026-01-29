@@ -217,8 +217,9 @@ class NhanVienKPIModel {
         $stmt3->execute($paramsBasic);
         $gkhlData = $stmt3->fetchAll(PDO::FETCH_ASSOC);
 
-        $gkhlAchieverMap = [];
-        $customerRunningNet = []; // Defined this back as simpler version if needed, or just let loop handle it
+        $gkhlAchieverMap = []; // [DSRCode][OrderDate] = số KH đạt chỉ tiêu
+        $gkhlAchievedCustomers = []; // [DSRCode][CustCode] = ngày đạt chỉ tiêu
+        
         foreach ($gkhlData as $gd) {
             $cust = $gd['CustCode'];
             $limitStr = $gd['gk_limit'];
@@ -233,8 +234,21 @@ class NhanVienKPIModel {
             $currNet = $prevNet + floatval($gd['day_net']);
             $customerRunningNet[$cust] = $currNet;
 
+            // ✅ CHỈ ĐẾM KH ĐẠT CHỈ TIÊU (chuyển từ chưa đạt -> đạt)
             if ($prevNet < $limit && $currNet >= $limit) {
-                $gkhlAchieverMap[$gd['DSRCode']][$gd['OrderDate']] = ($gkhlAchieverMap[$gd['DSRCode']][$gd['OrderDate']] ?? 0) + 1;
+                $dsrCode = $gd['DSRCode'];
+                $orderDate = $gd['OrderDate'];
+                
+                if (!isset($gkhlAchieverMap[$dsrCode][$orderDate])) {
+                    $gkhlAchieverMap[$dsrCode][$orderDate] = 0;
+                }
+                $gkhlAchieverMap[$dsrCode][$orderDate]++;
+                
+                // Lưu ngày đạt chỉ tiêu cho từng khách hàng
+                if (!isset($gkhlAchievedCustomers[$dsrCode])) {
+                    $gkhlAchievedCustomers[$dsrCode] = [];
+                }
+                $gkhlAchievedCustomers[$dsrCode][$cust] = $orderDate;
             }
         }
 
@@ -331,7 +345,9 @@ class NhanVienKPIModel {
                 $daily_schemes,   // Tiền KM -> index 5
                 $daily_multi_cust,// Chẻ đơn -> index 6
                 $daily_grosses,   // Tiền hàng -> index 7
-                $daily_gkhl_achievers // Khách chốt GKHL -> index 8
+                $daily_gkhl_achievers, // Khách chốt GKHL -> index 8
+                $dsrCode,         // Mã nhân viên -> index 9
+                $gkhlAchievedCustomers // Danh sách KH đạt GKHL -> index 10
             );
             $row['risk_score'] = $row['risk_analysis']['risk_score'];
             $row['risk_level'] = $row['risk_analysis']['risk_level'];
@@ -439,7 +455,7 @@ class NhanVienKPIModel {
         }
     }
 
-    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = [], $daily_orders = [], $daily_schemes = [], $daily_multi_cust = [], $daily_grosses = [], $daily_gkhl_achievers = []) {
+    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = [], $daily_orders = [], $daily_schemes = [], $daily_multi_cust = [], $daily_grosses = [], $daily_gkhl_achievers = [], $dsrCode = '', $gkhlAchievedCustomers = []) {
         $total_days = count($daily_customers);
         if ($total_days < 3) return $this->emptyRiskResult();
 
@@ -504,9 +520,10 @@ class NhanVienKPIModel {
                 if (abs($count - $prev_count) > max(3, $median * 1.2)) $is_alternating = true;
             }
 
-            // 6. Chốt số GKHL đột ngột (Theo chu kỳ rà soát 13-17 và 26-31)
+            // 6. Chốt số GKHL đột ngột (CHỈ đếm KH ĐẠT CHỈ TIÊU trong chu kỳ rà soát 13-17 và 26-31)
             $is_gkhl_achieving = false;
             $achievers_this_day = $daily_gkhl_achievers[$idx] ?? 0;
+            
             if ($achievers_this_day > 0) {
                 // Kiểm tra ngày dương lịch
                 $current_date = $daily_dates[$idx]; // Format Y-m-d
@@ -516,7 +533,10 @@ class NhanVienKPIModel {
                 // Chu kỳ rà soát: 13-17 và 26-31
                 $is_review_window = ($day_num >= 13 && $day_num <= 17) || ($day_num >= 26);
                 
-                if ($is_review_window) {
+                // ✅ CHỈ CỐI LÀ BẤT THƯỜNG NẾU:
+                // 1. Có KH ĐẠT chỉ tiêu (không phải chỉ đăng ký)
+                // 2. Trong chu kỳ rà soát
+                if ($is_review_window && $achievers_this_day > 0) {
                     $is_gkhl_achieving = true;
                 }
             }
@@ -794,6 +814,38 @@ class NhanVienKPIModel {
                 }
             }
             unset($row['orders_raw']);
+            
+            // ✅ TÍNH NGÀY ĐẠT GKHL (nếu có đăng ký)
+            $row['gkhl_achieved_date'] = null;
+            $row['gkhl_progress'] = 0;
+            
+            if ($row['is_gkhl'] == 1 && !empty($row['gk_limit'])) {
+                // Parse limit
+                $cleanLimit = preg_replace('/[^0-9]/', '', $row['gk_limit']);
+                $limit = floatval($cleanLimit);
+                
+                if ($limit > 0 && !empty($row['mtd_net'])) {
+                    $mtd_net = floatval($row['mtd_net']);
+                    $row['gkhl_progress'] = round(($mtd_net / $limit) * 100, 1);
+                    
+                    // Tính ngày đạt chỉ tiêu
+                    if ($mtd_net >= $limit && !empty($row['orders'])) {
+                        // Sắp xếp orders theo ngày
+                        usort($row['orders'], function($a, $b) {
+                            return strcmp($a['date'], $b['date']);
+                        });
+                        
+                        $runningTotal = 0;
+                        foreach ($row['orders'] as $order) {
+                            $runningTotal += $order['amount'];
+                            if ($runningTotal >= $limit) {
+                                $row['gkhl_achieved_date'] = $order['date'];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
         
         return $results;
