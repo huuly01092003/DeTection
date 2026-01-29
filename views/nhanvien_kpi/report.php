@@ -251,7 +251,11 @@ $isViewer = isViewer();
                                 <th class="text-center" style="width: 80px;">Mức Độ</th>
                                 <th style="width: 100px;">Mã NV</th>
                                 <th style="width: 200px;">Tên NV</th>
-                                <th style="width: 100px;">GSBH</th>
+                                <th style="width: 120px;">Bộ Phận</th>
+                                <th style="width: 120px;">Chức Vụ</th>
+                                <th style="width: 100px;">Tỉnh</th>
+                                <th style="width: 100px;">Mã QL</th>
+                                <th style="width: 150px;">Tên QL</th>
                                 <th class="text-end" style="width: 100px;">TB Khách/Ngày</th>
                                 <th class="text-end" style="width: 100px;">Max/Ngày</th>
                                 <th class="text-center" style="width: 100px;">Vi Phạm</th>
@@ -268,8 +272,17 @@ $isViewer = isViewer();
                             <tr>
                                 <td class="text-center"><span class="badge <?= $badge ?>"><?= $icon ?></span></td>
                                 <td><strong><?= htmlspecialchars($item['DSRCode']) ?></strong></td>
-                                <td><?= htmlspecialchars($item['ten_nv']) ?></td>
-                                <td><?= htmlspecialchars($item['MaGSBH'] ?? '-') ?></td>
+                                <td>
+                                    <?= htmlspecialchars($item['ten_nv']) ?>
+                                    <?php if (!empty($item['khu_vuc'])): ?>
+                                        <div class="text-muted small"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($item['khu_vuc']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td><small><?= htmlspecialchars($item['bo_phan'] ?? '-') ?></small></td>
+                                <td><small><?= htmlspecialchars($item['chuc_vu'] ?? '-') ?></small></td>
+                                <td><small><?= htmlspecialchars($item['base_tinh'] ?? '-') ?></small></td>
+                                <td><small><?= htmlspecialchars($item['ma_nv_ql'] ?? '-') ?></small></td>
+                                <td><small><?= htmlspecialchars($item['ten_nv_ql'] ?? '-') ?></small></td>
                                 <td class="text-end"><?= number_format($item['avg_daily_customers'], 1) ?></td>
                                 <td class="text-end text-danger"><strong><?= intval($item['max_day_customers']) ?></strong></td>
                                 <td class="text-center">
@@ -506,27 +519,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const tuNgayInput = document.getElementById('tuNgay');
     const denNgayInput = document.getElementById('denNgay');
 
-    // Hàm lấy ngày cuối cùng của tháng (YYYY-MM)
-    function getLastDayOfMonth(yearMonth) {
-        const [year, month] = yearMonth.split('-').map(Number);
-        return new Date(year, month, 0).getDate();
-    }
+    // Dữ liệu khoảng ngày thực tế từ Controller
+    const actualDateRanges = <?= json_encode($date_ranges ?? []) ?>;
 
     // 1. Xử lý khi thay đổi Tháng/Năm
     selectThang.addEventListener('change', function() {
         const monthVal = this.value; // Định dạng YYYY-MM
         if (!monthVal) return;
 
-        const lastDay = getLastDayOfMonth(monthVal);
+        let firstDate, lastDate;
         
-        const firstDate = `${monthVal}-01`;
-        const lastDate = `${monthVal}-${lastDay}`;
+        if (actualDateRanges[monthVal]) {
+            firstDate = actualDateRanges[monthVal].min_date;
+            lastDate = actualDateRanges[monthVal].max_date;
+        } else {
+            const [year, month] = monthVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            firstDate = `${monthVal}-01`;
+            lastDate = `${monthVal}-${daysInMonth}`;
+        }
 
         // Cập nhật giá trị
         tuNgayInput.value = firstDate;
         denNgayInput.value = lastDate;
 
-        // Cập nhật min/max để giới hạn người dùng không chọn ngoài tháng
+        // Cập nhật min/max
         tuNgayInput.min = firstDate;
         tuNgayInput.max = lastDate;
         denNgayInput.min = firstDate;
@@ -548,14 +565,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Kích hoạt giới hạn ngay khi load trang nếu đã có tháng được chọn sẵn
+    // Kích hoạt giới hạn ngay khi load trang
     if (selectThang.value) {
         const monthVal = selectThang.value;
-        const lastDay = getLastDayOfMonth(monthVal);
-        tuNgayInput.min = `${monthVal}-01`;
-        tuNgayInput.max = `${monthVal}-${lastDay}`;
-        denNgayInput.min = `${monthVal}-01`;
-        denNgayInput.max = `${monthVal}-${lastDay}`;
+        let firstDate, lastDate;
+        
+        if (actualDateRanges[monthVal]) {
+            firstDate = actualDateRanges[monthVal].min_date;
+            lastDate = actualDateRanges[monthVal].max_date;
+        } else {
+            const [year, month] = monthVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            firstDate = `${monthVal}-01`;
+            lastDate = `${monthVal}-${daysInMonth}`;
+        }
+        
+        tuNgayInput.min = firstDate;
+        tuNgayInput.max = lastDate;
+        denNgayInput.min = firstDate;
+        denNgayInput.max = lastDate;
     }
 });
 </script>

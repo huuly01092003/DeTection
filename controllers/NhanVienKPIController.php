@@ -37,6 +37,7 @@ class NhanVienKPIController {
         
         try {
             $available_months = $this->model->getAvailableMonths();
+            $date_ranges = $this->model->getActualDateRanges(); // ✅ Khoảng ngày thực tế
             
             if (empty($available_months)) {
                 $message = "⚠️ Chưa có dữ liệu. Vui lòng import OrderDetail trước.";
@@ -49,11 +50,24 @@ class NhanVienKPIController {
             
             $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
             
+            $thang = !empty($_GET['thang']) ? $_GET['thang'] : $available_months[0];
+            if (!in_array($thang, $available_months)) $thang = $available_months[0];
+
+            // ✅ Lấy khoảng ngày thực tế cho tháng đã chọn
+            $range = $date_ranges[$thang] ?? null;
+            if ($range) {
+                $default_tu_ngay = $range['min_date'];
+                $default_den_ngay = $range['max_date'];
+            } else {
+                $default_tu_ngay = $thang . '-01';
+                $default_den_ngay = date('Y-m-t', strtotime($default_tu_ngay));
+            }
+            
             if (!$has_filtered) {
                 $filters = [
-                    'thang' => $available_months[0] ?? '',
-                    'tu_ngay' => !empty($available_months[0]) ? $available_months[0] . '-01' : '',
-                    'den_ngay' => !empty($available_months[0]) ? date('Y-m-t', strtotime($available_months[0] . '-01')) : '',
+                    'thang' => $thang,
+                    'tu_ngay' => $default_tu_ngay,
+                    'den_ngay' => $default_den_ngay,
                     'product_filter' => '',
                     'threshold_n' => $threshold_n
                 ];
@@ -74,9 +88,6 @@ class NhanVienKPIController {
                 require_once 'views/nhanvien_kpi/report.php';
                 return;
             }
-            
-            $thang = !empty($_GET['thang']) ? $_GET['thang'] : $available_months[0];
-            if (!in_array($thang, $available_months)) $thang = $available_months[0];
             
             $tu_ngay = trim($_GET['tu_ngay']);
             $den_ngay = trim($_GET['den_ngay']);

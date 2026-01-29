@@ -62,13 +62,22 @@ class NhanVienKPIModel {
         }
         
         // ✅ QUERY ĐƠN GIẢN - Lấy danh sách nhân viên trước
-        $sql1 = "SELECT DISTINCT 
+        // Sử dụng dsnv để lấy nhiều thông tin hơn giống NhanVienReport
+        $sql1 = "SELECT 
                     o.DSRCode,
                     o.DSRTypeProvince,
-                    MAX(nv.TenNVBH) as TenNVBH,
-                    MAX(nv.MaGSBH) as MaGSBH
+                    MAX(nv.ho_ten) as TenNVBH,
+                    MAX(nv.bo_phan) as bo_phan,
+                    MAX(nv.chuc_vu) as chuc_vu,
+                    MAX(nv.base_tinh) as base_tinh,
+                    MAX(nv.khu_vuc) as khu_vuc,
+                    MAX(nv.kenh_ban_hang) as kenh_ban_hang,
+                    MAX(nv.trang_thai) as trang_thai,
+                    MAX(nv.ma_nv_ql) as ma_nv_ql,
+                    MAX(nv.ten_nv_ql) as ten_nv_ql,
+                    MAX(nv.ngay_vao_cty) as ngay_vao_cty
                 FROM orderdetail o
-                LEFT JOIN dskh nv ON o.DSRCode = nv.MaNVBH
+                LEFT JOIN dsnv nv ON o.DSRCode = nv.ma_nv
                 WHERE o.DSRCode IS NOT NULL 
                 AND o.DSRCode != ''
                 AND DATE(o.OrderDate) >= ?
@@ -146,7 +155,8 @@ class NhanVienKPIModel {
                 'DSRCode' => $emp['DSRCode'],
                 'DSRTypeProvince' => $emp['DSRTypeProvince'],
                 'TenNVBH' => $emp['TenNVBH'],
-                'MaGSBH' => $emp['MaGSBH'],
+                'ma_nv_ql' => $emp['ma_nv_ql'],
+                'ten_nv_ql' => $emp['ten_nv_ql'],
                 'total_orders' => $total_orders,
                 'total_customers' => $total_customers,
                 'total_amount' => $total_amount,
@@ -163,13 +173,24 @@ class NhanVienKPIModel {
                 'avg_daily_customers' => $working_days > 0 ? round($total_customers / $working_days, 2) : 0,
             ];
             
-            // Phân tích risk
-            $row['risk_analysis'] = $this->analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates);
+            // Phân tích risk nâng cao
+            $row['risk_analysis'] = $this->analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates, $daily_amounts);
             $row['risk_score'] = $row['risk_analysis']['risk_score'];
             $row['risk_level'] = $row['risk_analysis']['risk_level'];
             $row['violation_days'] = $row['risk_analysis']['violation_days'];
             $row['violation_count'] = $row['risk_analysis']['violation_count'];
-            $row['ten_nv'] = !empty($row['TenNVBH']) ? $row['TenNVBH'] : 'NV_' . $row['DSRCode'];
+            
+            // Thông tin chi tiết nhân viên
+            $row['ten_nv'] = !empty($emp['TenNVBH']) ? $emp['TenNVBH'] : 'NV_' . $emp['DSRCode'];
+            $row['bo_phan'] = $emp['bo_phan'] ?? 'N/A';
+            $row['chuc_vu'] = $emp['chuc_vu'] ?? 'N/A';
+            $row['base_tinh'] = $emp['base_tinh'] ?? ($emp['DSRTypeProvince'] ?? '');
+            $row['khu_vuc'] = $emp['khu_vuc'] ?? '';
+            $row['kenh_ban_hang'] = $emp['kenh_ban_hang'] ?? '';
+            $row['trang_thai'] = $emp['trang_thai'] ?? '';
+            $row['ma_nv_ql'] = $emp['ma_nv_ql'] ?? '';
+            $row['ten_nv_ql'] = $emp['ten_nv_ql'] ?? '';
+            $row['ngay_vao_cty'] = $emp['ngay_vao_cty'] ?? '';
             
             $results[] = $row;
         }
@@ -260,76 +281,133 @@ class NhanVienKPIModel {
         }
     }
 
-    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = []) {
+    /**
+     * ✅ PHÂN TÍCH RỦI RO NÂNG CAO (Advanced KPI Logic)
+     * 1. Threshold Violation: Vi phạm ngưỡng tuyệt đối.
+     * 2. Statistical Anomaly (Z-Score): Bất thường so với chính mình.
+     * 3. Efficiency Decline: Doanh số TB/khách thấp bất thường vào ngày có nhiều khách (Filler orders).
+     * 4. Consecutive Violations: Vi phạm liên tiếp.
+     */
+    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = []) {
+        $total_days = count($daily_customers);
+        if ($total_days === 0) return $this->emptyRiskResult();
+
         $violation_days = [];
         $violation_count = 0;
-        $max_violation = 0;
+        $max_absolute_customers = 0;
         
-        foreach ($daily_customers as $idx => $customers_per_day) {
-            if ($customers_per_day > $threshold_n) {
-                $violation_count++;
-                $violation_amount = $customers_per_day - $threshold_n;
-                $max_violation = max($max_violation, $violation_amount);
-                
+        // 1. TÍNH TOÁN CƠ BẢN VÀ baseline (Trung bình, Độ lệch chuẩn cho Z-Score)
+        $avg_cust = array_sum($daily_customers) / $total_days;
+        $sum_sq_diff = 0;
+        foreach ($daily_customers as $c) $sum_sq_diff += pow($c - $avg_cust, 2);
+        $std_dev = sqrt($sum_sq_diff / $total_days);
+        $std_dev = max(1, $std_dev); // Tránh chia cho 0
+
+        // Baseline AOV (Doanh số TB/khách) của nhân viên này
+        $total_amount = array_sum($daily_amounts);
+        $total_cust = array_sum($daily_customers);
+        $baseline_aov = $total_cust > 0 ? ($total_amount / $total_cust) : 0;
+
+        $risk_scores = [
+            'threshold' => 0,
+            'statistical' => 0,
+            'efficiency' => 0,
+            'consecutive' => 0
+        ];
+
+        foreach ($daily_customers as $idx => $count) {
+            $is_threshold_violation = ($count > $threshold_n);
+            $z_score = ($count - $avg_cust) / $std_dev;
+            $is_statistical_anomaly = ($z_score > 2); // Trên 2 standard deviations là bất thường
+            
+            $day_amount = $daily_amounts[$idx] ?? 0;
+            $day_aov = $count > 0 ? ($day_amount / $count) : 0;
+            
+            // Efficiency drop: Nếu số khách cao nhưng AOV thấp hơn 50% baseline
+            $has_efficiency_drop = ($count >= $threshold_n && $day_aov < ($baseline_aov * 0.5));
+
+            if ($is_threshold_violation || $is_statistical_anomaly || $has_efficiency_drop) {
+                if ($is_threshold_violation) $violation_count++;
+                $max_absolute_customers = max($max_absolute_customers, $count);
+
+                $reasons = [];
+                if ($is_threshold_violation) $reasons[] = "Vượt ngưỡng N=" . $threshold_n;
+                if ($is_statistical_anomaly) $reasons[] = "Bất thường thống kê (Z=" . round($z_score, 1) . ")";
+                if ($has_efficiency_drop) $reasons[] = "Hiệu suất thấp (Gom đơn)";
+
                 $violation_days[] = [
                     'date' => $daily_dates[$idx] ?? "Ngày $idx",
-                    'customers' => $customers_per_day,
+                    'customers' => $count,
                     'threshold' => $threshold_n,
-                    'violation' => $violation_amount,
-                    'ratio' => round(($customers_per_day / $threshold_n) * 100, 1)
+                    'z_score' => round($z_score, 1),
+                    'day_aov' => $day_aov,
+                    'baseline_aov' => $baseline_aov,
+                    'reasons' => $reasons,
+                    'is_critical' => ($is_threshold_violation && $is_statistical_anomaly)
                 ];
             }
         }
+
+        // 2. TÍNH ĐIỂM RISK (0-100)
         
-        $total_days = count($daily_customers);
-        $violation_rate = $total_days > 0 ? ($violation_count / $total_days) * 100 : 0;
+        // A. Điểm vi phạm ngưỡng (Max 40đ)
+        $violation_rate = ($violation_count / $total_days) * 100;
+        $risk_scores['threshold'] = min(40, ($violation_rate / 100) * 40);
         
-        $risk_score = 0;
-        
-        if ($violation_rate >= 80) {
-            $risk_score += 40;
-        } elseif ($violation_rate >= 60) {
-            $risk_score += 30;
-        } elseif ($violation_rate >= 40) {
-            $risk_score += 20;
-        } elseif ($violation_rate >= 20) {
-            $risk_score += 10;
+        // Bonus penalty cho mức độ vượt (N * X)
+        $excess_ratio = $max_absolute_customers / max(1, $threshold_n);
+        if ($excess_ratio >= 3) $risk_scores['threshold'] += 10;
+        elseif ($excess_ratio >= 2) $risk_scores['threshold'] += 5;
+
+        // B. Điểm bất thường thống kê (Max 30đ)
+        $anomalies = array_filter($violation_days, fn($v) => $v['z_score'] > 2);
+        if (count($anomalies) > 0) {
+            $risk_scores['statistical'] = min(30, count($anomalies) * 10);
         }
-        
-        if ($max_violation >= $threshold_n * 3) {
-            $risk_score += 40;
-        } elseif ($max_violation >= $threshold_n * 2) {
-            $risk_score += 30;
-        } elseif ($max_violation >= $threshold_n * 1.5) {
-            $risk_score += 20;
-        } elseif ($max_violation >= $threshold_n) {
-            $risk_score += 10;
+
+        // C. Điểm hiệu suất/gom đơn (Max 20đ)
+        $efficiency_drops = array_filter($violation_days, fn($v) => in_array("Hiệu suất thấp (Gom đơn)", $v['reasons']));
+        if (count($efficiency_drops) > 0) {
+            $risk_scores['efficiency'] = min(20, count($efficiency_drops) * 7);
         }
-        
+
+        // D. Điểm vi phạm liên tiếp (Max 10đ)
         $consecutive = $this->countConsecutiveViolations($daily_customers, $threshold_n);
-        if ($consecutive >= 3) {
-            $risk_score += 20;
-        } elseif ($consecutive >= 1) {
-            $risk_score += 10;
-        }
-        
-        if ($risk_score >= 75) {
-            $risk_level = 'critical';
-        } elseif ($risk_score >= 50) {
-            $risk_level = 'warning';
-        } else {
-            $risk_level = 'normal';
-        }
-        
+        if ($consecutive >= 5) $risk_scores['consecutive'] = 10;
+        elseif ($consecutive >= 3) $risk_scores['consecutive'] = 7;
+        elseif ($consecutive >= 2) $risk_scores['consecutive'] = 3;
+
+        $total_risk_score = min(100, array_sum($risk_scores));
+
+        // Phân loại Level
+        if ($total_risk_score >= 80) $risk_level = 'critical';
+        elseif ($total_risk_score >= 50) $risk_level = 'warning';
+        else $risk_level = 'normal';
+
         return [
-            'risk_score' => min(100, $risk_score),
+            'risk_score' => round($total_risk_score, 0),
             'risk_level' => $risk_level,
+            'risk_breakdown' => $risk_scores,
             'violation_count' => $violation_count,
             'total_days' => $total_days,
             'violation_rate' => round($violation_rate, 1),
-            'max_violation' => $max_violation,
+            'max_violation' => max(0, $max_absolute_customers - $threshold_n),
             'consecutive_violations' => $consecutive,
-            'violation_days' => $violation_days
+            'violation_days' => $violation_days,
+            'stats' => [
+                'avg_cust' => round($avg_cust, 1),
+                'std_dev' => round($std_dev, 1),
+                'baseline_aov' => $baseline_aov
+            ]
+        ];
+    }
+
+    private function emptyRiskResult() {
+        return [
+            'risk_score' => 0,
+            'risk_level' => 'normal',
+            'violation_count' => 0,
+            'violation_days' => []
         ];
     }
 
@@ -475,11 +553,40 @@ class NhanVienKPIModel {
         $sql = "SELECT DISTINCT CONCAT(RptYear, '-', LPAD(RptMonth, 2, '0')) as thang
                 FROM orderdetail
                 WHERE RptYear IS NOT NULL AND RptMonth IS NOT NULL
-                ORDER BY RptYear DESC, RptMonth DESC LIMIT 24";
+                AND RptYear >= 2020
+                ORDER BY RptYear DESC, RptMonth DESC
+                LIMIT 24";
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY KHOẢNG NGÀY THỰC TẾ CHO MỖI KỲ BÁO CÁO
+     */
+    public function getActualDateRanges() {
+        $sql = "SELECT 
+                    CONCAT(RptYear, '-', LPAD(RptMonth, 2, '0')) as thang,
+                    MIN(DATE(OrderDate)) as min_date,
+                    MAX(DATE(OrderDate)) as max_date
+                FROM orderdetail
+                WHERE RptYear IS NOT NULL AND RptMonth IS NOT NULL
+                AND RptYear >= 2020
+                GROUP BY RptYear, RptMonth
+                ORDER BY RptYear DESC, RptMonth DESC
+                LIMIT 24";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        $results = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $results[$row['thang']] = [
+                'min_date' => $row['min_date'],
+                'max_date' => $row['max_date']
+            ];
+        }
+        return $results;
     }
 
     public function getAvailableProducts() {
