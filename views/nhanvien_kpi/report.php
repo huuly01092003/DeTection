@@ -98,10 +98,99 @@ $isViewer = isViewer();
         .order-chip { 
             background: #e3f2fd; 
             padding: 3px 8px; 
-            border-radius: 8px; 
-            margin: 2px; 
-            display: inline-block; 
+            border-radius: 5px; 
             font-size: 0.75rem; 
+            margin-right: 5px; 
+            border: 1px solid #bbdefb;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .order-chip:hover {
+            background: #2196f3;
+            color: white;
+        }
+        .clickable-row {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .clickable-row:hover {
+            background-color: rgba(102, 126, 234, 0.1) !important;
+        }
+        
+        /* Modal Resizable/Draggable handles */
+        .modal-content {
+            resize: both;
+            overflow: hidden; /* Hide overflow to allow resizing of content via body */
+            min-width: 500px;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-body {
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-header {
+            cursor: move;
+            flex-shrink: 0;
+        }
+        
+        /* Unified Investigation Hub Styles */
+        .investigation-level {
+            transition: all 0.3s ease-in-out;
+        }
+        .breadcrumb-item a:hover {
+            color: white !important;
+            text-decoration: underline !important;
+        }
+        .breadcrumb-item.active {
+            color: white !important;
+            font-weight: bold;
+        }
+        .investigation-modal .modal-content {
+            border-radius: 15px;
+        }
+        .detail-sub-row {
+            background-color: #f8f9fa;
+        }
+        .detail-container {
+            padding: 15px;
+            border-left: 4px solid #3b82f6;
+            margin: 10px;
+            background: white;
+            border-radius: 0 8px 8px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .order-products-container {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 6px;
+            display: none;
+        }
+        .expand-icon {
+            transition: transform 0.3s;
+        }
+        .expanded .expand-icon {
+            transform: rotate(90deg);
+        }
+        .gkhl-badge {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        .mst-badge {
+            background: #e9ecef;
+            color: #495057;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
         }
         .empty-state { 
             text-align: center; 
@@ -300,11 +389,7 @@ $isViewer = isViewer();
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-primary" 
                                             onclick='showDetail(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'>
-                                        <i class="fas fa-eye"></i> Vi Phạm
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-success" 
-                                            onclick="loadCustomers('<?= htmlspecialchars($item['DSRCode']) ?>', '<?= htmlspecialchars($item['ten_nv']) ?>')">
-                                        <i class="fas fa-users"></i> Khách
+                                        <i class="fas fa-search"></i> Điều Tra Vi Phạm
                                     </button>
                                 </td>
                             </tr>
@@ -319,32 +404,19 @@ $isViewer = isViewer();
     </div>
 </div>
 
-<!-- Modal Vi Phạm -->
-<div class="modal fade" id="violationModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                <h5 class="modal-title">Chi Tiết Vi Phạm - <span id="violationEmpName"></span></h5>
+<!-- Modal Trung Tâm Điều Tra (Tất cả trong 1) -->
+<div class="modal fade investigation-modal" id="violationModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content overflow-hidden border-0 shadow-lg" style="height: 85vh;">
+            <div class="modal-header border-0 p-3" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
+                <h5 class="modal-title fw-bold text-white mb-0">
+                    <i class="fas fa-shield-alt me-2"></i>Chi Tiết Điều Tra KPI: <span id="violationStaffName"></span>
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="violationContent"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Khách Hàng -->
-<div class="modal fade" id="customerModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white;">
-                <h5 class="modal-title">Danh Sách Khách Hàng - <span id="customerEmpName"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="customerContent">
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2">Đang tải dữ liệu...</p>
-                </div>
+            
+            <div class="modal-body p-0 bg-light overflow-auto">
+                <div id="violationContent" class="p-4"></div>
             </div>
         </div>
     </div>
@@ -352,153 +424,287 @@ $isViewer = isViewer();
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Hiển thị chi tiết vi phạm
+// Hiển thị chi tiết vi phạm (Level 1)
 function showDetail(data) {
-    document.getElementById('violationEmpName').textContent = data.ten_nv;
+    document.getElementById('violationStaffName').textContent = data.ten_nv;
+    
+    const rb = data.risk_analysis.risk_breakdown || {};
     
     let html = `
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h6>Vi Phạm</h6>
-                        <h3 class="text-danger">${data.violation_count} ngày</h3>
-                        <small>${data.risk_analysis.violation_rate}% thời gian</small>
+        <!-- Thông tin nhân viên -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; border-left: 5px solid #1e3a8a !important;">
+            <div class="card-body p-3">
+                <div class="row align-items-center">
+                    <div class="col-md-auto text-center border-end pe-4">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" style="width: 50px; height: 50px;">
+                            <i class="fas fa-user-tie fa-lg"></i>
+                        </div>
+                        <div class="fw-bold text-dark">${data.DSRCode}</div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h6>Vượt Tối Đa</h6>
-                        <h3 class="text-warning">${data.risk_analysis.max_violation}</h3>
-                        <small>khách</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h6>Liên Tục</h6>
-                        <h3 class="text-info">${data.risk_analysis.consecutive_violations}</h3>
-                        <small>ngày</small>
+                    <div class="col-md ps-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="small text-muted mb-1"><i class="fas fa-sitemap me-1"></i>Bộ phận / Chức vụ</div>
+                                <div class="fw-bold text-dark">${data.bo_phan} - ${data.chuc_vu}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="small text-muted mb-1"><i class="fas fa-user-shield me-1"></i>Quản lý trực tiếp</div>
+                                <div class="fw-bold text-dark">${data.ten_nv_ql} <small class="text-muted">[${data.ma_nv_ql}]</small></div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="small text-muted mb-1"><i class="fas fa-calendar-check me-1"></i>Ngày vào làm</div>
+                                <div class="fw-bold text-dark">${data.ngay_vao_cty || 'N/A'}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <h6 class="border-bottom pb-2">Chi Tiết Các Ngày Vi Phạm</h6>
-        <div class="table-responsive">
-            <table class="table table-striped table-sm">
-                <thead>
-                    <tr>
-                        <th>Ngày</th>
-                        <th class="text-end">Số Khách</th>
-                        <th class="text-end">Ngưỡng</th>
-                        <th class="text-end">Vượt</th>
-                        <th class="text-end">% So Ngưỡng</th>
-                    </tr>
-                </thead>
-                <tbody>
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="p-3 border rounded-3 bg-white shadow-sm text-center h-100 d-flex flex-column justify-content-center">
+                    <div class="small text-muted fw-bold mb-1">TỔNG ĐIỂM</div>
+                    <div class="h3 mb-0 fw-bold ${data.risk_level === 'critical' ? 'text-danger' : 'text-warning'}">${data.risk_score}đ</div>
+                    <span class="badge ${data.risk_level === 'critical' ? 'bg-danger' : 'bg-warning text-dark'} mt-1 align-self-center">${data.risk_level.toUpperCase()}</span>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div class="row g-2">
+                    <div class="col-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm">
+                            <div class="small text-muted">Vượt Ngưỡng</div>
+                            <div class="fw-bold text-danger">${Math.round(rb.threshold)}đ</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm">
+                            <div class="small text-muted">Bất Thường</div>
+                            <div class="fw-bold text-warning">${Math.round(rb.statistical)}đ</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm">
+                            <div class="small text-muted">Hiệu Suất</div>
+                            <div class="fw-bold text-info">${Math.round(rb.efficiency)}đ</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm">
+                            <div class="small text-muted">Liên Tiếp</div>
+                            <div class="fw-bold text-secondary">${Math.round(rb.consecutive)}đ</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0 text-dark">LịCH SỬ PHÁT HIỆN BẤT THƯỜNG</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0" id="violationTable">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="width: 40px;"></th>
+                            <th>Ngày Phân Tích</th>
+                            <th class="text-end">Khách hàng / Đơn hàng</th>
+                            <th class="text-end">Z-Score</th>
+                            <th class="text-end">AOV Ngày</th>
+                            <th>Lý do rủi ro</th>
+                        </tr>
+                    </thead>
+                    <tbody>
     `;
     
     if (data.risk_analysis.violation_days && data.risk_analysis.violation_days.length > 0) {
-        data.risk_analysis.violation_days.forEach(v => {
+        data.risk_analysis.violation_days.forEach((v, index) => {
+            const zClass = v.z_score > 3 ? 'text-danger' : (v.z_score > 2 ? 'text-warning' : '');
+            
             html += `
-                <tr>
-                    <td>${v.date}</td>
-                    <td class="text-end"><strong>${v.customers}</strong></td>
-                    <td class="text-end">${v.threshold}</td>
-                    <td class="text-end text-danger">+${v.violation}</td>
-                    <td class="text-end">${v.ratio}%</td>
+                <tr class="clickable-row" id="row-${index}" onclick="toggleDayDetails('${index}', '${data.DSRCode}', '${v.date}')">
+                    <td class="text-center"><i class="fas fa-chevron-right expand-icon" id="icon-${index}"></i></td>
+                    <td><strong class="text-muted">${v.date}</strong></td>
+                    <td class="text-end"><strong>${v.customers}</strong> KH</td>
+                    <td class="text-end"><span class="fw-bold ${zClass}">${v.z_score}</span></td>
+                    <td class="text-end fw-bold text-primary">${formatMoney(v.day_aov)}</td>
+                    <td>
+                        <div class="small">
+                            ${v.reasons.map(r => `<span class="badge bg-light text-dark border me-1">${r}</span>`).join('')}
+                        </div>
+                    </td>
+                </tr>
+                <tr class="detail-sub-row d-none" id="subrow-${index}">
+                    <td colspan="6">
+                        <div class="detail-container" id="container-${index}">
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                                <span class="ms-2">Đang tải chi tiết giao dịch...</span>
+                            </div>
+                        </div>
+                    </td>
                 </tr>
             `;
         });
     } else {
-        html += '<tr><td colspan="5" class="text-center text-success">Không có vi phạm</td></tr>';
+        html += '<tr><td colspan="6" class="text-center py-4 text-success">Không có vi phạm nghiêm trọng</td></tr>';
     }
     
-    html += '</tbody></table></div>';
+    html += `</tbody></table></div></div>`;
     
     document.getElementById('violationContent').innerHTML = html;
     new bootstrap.Modal(document.getElementById('violationModal')).show();
 }
 
-// Load danh sách khách hàng (AJAX)
-function loadCustomers(dsrCode, empName) {
-    document.getElementById('customerEmpName').textContent = empName;
-    document.getElementById('customerContent').innerHTML = `
-        <div class="text-center py-5">
-            <div class="spinner-border text-primary"></div>
-            <p class="mt-2">Đang tải danh sách khách hàng...</p>
-        </div>
-    `;
-    
-    const modal = new bootstrap.Modal(document.getElementById('customerModal'));
-    modal.show();
-    
-    const params = new URLSearchParams({
-        action: 'get_customers',
-        dsr_code: dsrCode,
-        tu_ngay: '<?= $filters['tu_ngay'] ?? '' ?>',
-        den_ngay: '<?= $filters['den_ngay'] ?? '' ?>',
-        product_filter: '<?= $filters['product_filter'] ?? '' ?>'
-    });
-    
-    fetch(`nhanvien_kpi.php?${params}`)
-        .then(r => r.json())
-        .then(result => {
-            if (result.success) {
-                renderCustomers(result.data);
-            } else {
-                document.getElementById('customerContent').innerHTML = `
-                    <div class="alert alert-danger">Lỗi: ${result.error}</div>
-                `;
-            }
-        })
-        .catch(err => {
-            document.getElementById('customerContent').innerHTML = `
-                <div class="alert alert-danger">Lỗi kết nối: ${err.message}</div>
-            `;
-        });
-}
+function toggleDayDetails(index, dsrCode, date) {
+    const row = document.getElementById(`row-${index}`);
+    const subrow = document.getElementById(`subrow-${index}`);
+    const container = document.getElementById(`container-${index}`);
+    const icon = document.getElementById(`icon-${index}`);
 
-function renderCustomers(customers) {
-    if (!customers || customers.length === 0) {
-        document.getElementById('customerContent').innerHTML = `
-            <div class="alert alert-info">Không có khách hàng trong khoảng thời gian này</div>
-        `;
+    if (!subrow.classList.contains('d-none')) {
+        subrow.classList.add('d-none');
+        row.classList.remove('expanded');
         return;
     }
-    
-    let html = `<div class="mb-3"><strong>Tổng: ${customers.length} khách hàng</strong></div>`;
-    
-    customers.forEach((c, idx) => {
-        html += `
-            <div class="customer-row">
-                <div class="row">
-                    <div class="col-md-8">
-                        <strong>${idx + 1}. ${escapeHtml(c.customer_name || c.CustCode)}</strong>
-                        <div class="text-muted small">${escapeHtml(c.customer_address || '-')} | ${escapeHtml(c.customer_province || '-')}</div>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <div><strong>${formatMoney(c.total_amount)}</strong></div>
-                        <div class="text-muted small">${c.order_count} đơn hàng</div>
-                    </div>
-                </div>
-                <div class="mt-2">
-        `;
-        
-        if (c.orders && c.orders.length > 0) {
-            c.orders.forEach(o => {
-                html += `<span class="order-chip">${o.date}: ${escapeHtml(o.order_number)} (${formatMoney(o.amount)})</span>`;
+
+    // Close others
+    document.querySelectorAll('.detail-sub-row').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.clickable-row').forEach(el => el.classList.remove('expanded'));
+
+    subrow.classList.remove('d-none');
+    row.classList.add('expanded');
+
+    // Load if empty
+    if (container.getAttribute('data-loaded') !== 'true') {
+        const params = new URLSearchParams({
+            action: 'get_customers',
+            dsr_code: dsrCode,
+            tu_ngay: date,
+            den_ngay: date,
+            product_filter: '<?= $filters['product_filter'] ?? '' ?>'
+        });
+
+        fetch(`nhanvien_kpi.php?${params}`)
+            .then(r => r.json())
+            .then(result => {
+                if (result.success) {
+                    renderInlineCustomers(container, result.data);
+                    container.setAttribute('data-loaded', 'true');
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger">${result.error}</div>`;
+                }
             });
+    }
+}
+
+function renderInlineCustomers(container, customers) {
+    if (!customers || customers.length === 0) {
+        container.innerHTML = '<div class="text-muted">Không có dữ liệu khách hàng</div>';
+        return;
+    }
+
+    let html = `<h6><i class="fas fa-users me-2 text-primary"></i>Danh sách khách hàng giao dịch (${customers.length})</h6>`;
+    
+    customers.forEach((c, cIdx) => {
+        let gkhlHtml = '';
+        if (c.is_gkhl == 1) {
+            gkhlHtml = `
+                <div class="mt-2 p-2 rounded bg-warning-subtle border border-warning" style="font-size: 0.75rem;">
+                    <div class="fw-bold text-dark"><i class="fas fa-handshake me-1"></i>Đăng ký GKHL:</div>
+                    <div class="text-muted">${escapeHtml(c.gkhl_types)}</div>
+                </div>
+            `;
         }
         
+        html += `
+            <div class="border-bottom py-3">
+                <div class="row align-items-start">
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center mb-1">
+                            <div class="fw-bold text-dark h6 mb-0">${escapeHtml(c.customer_name)}</div>
+                            <small class="text-muted ms-2">[${c.CustCode}]</small>
+                            ${c.is_gkhl == 1 ? '<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem">GKHL</span>' : ''}
+                        </div>
+                        <div class="small text-muted mb-2"><i class="fas fa-map-marker-alt me-1"></i>${escapeHtml(c.customer_address)}</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="badge bg-light text-dark border"><i class="fas fa-id-card me-1"></i>MST: ${escapeHtml(c.tax_code || 'N/A')}</span>
+                            <span class="badge bg-light text-dark border"><i class="fas fa-tag me-1"></i>Loại: ${escapeHtml(c.customer_type || 'N/A')}</span>
+                            <span class="badge bg-light text-dark border"><i class="fas fa-users-cog me-1"></i>Nhóm: ${escapeHtml(c.customer_group || 'N/A')}</span>
+                        </div>
+                        ${gkhlHtml}
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="fw-bold text-success h5 mb-0">${formatMoney(c.total_amount)}</div>
+                        <div class="small text-muted">${c.order_count} đơn hàng</div>
+                    </div>
+                </div>
+                <div class="mt-2 text-nowrap overflow-auto pb-1" style="max-width: 100%;">
+        `;
+
+        if (c.orders) {
+            c.orders.forEach((o, oIdx) => {
+                const orderId = `order-${cIdx}-${oIdx}-${Math.random().toString(36).substr(2, 5)}`;
+                html += `
+                    <div class="d-inline-block me-2">
+                        <span class="order-chip pointer mb-1" onclick="toggleOrderProducts('${orderId}', '${o.order_number}')">
+                            <i class="fas fa-file-invoice me-1"></i>${o.order_number} (${formatMoney(o.amount)})
+                        </span>
+                        <div id="${orderId}" class="order-products-container border border-secondary shadow-sm">
+                            <div class="text-center py-2"><i class="fas fa-spinner fa-spin"></i></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
         html += `</div></div>`;
     });
     
-    document.getElementById('customerContent').innerHTML = html;
+    container.innerHTML = html;
+}
+
+function toggleOrderProducts(elementId, orderNumber) {
+    const container = document.getElementById(elementId);
+    if (container.style.display === 'block') {
+        container.style.display = 'none';
+        return;
+    }
+
+    // Hide other containers in the same customer row? No, maybe keep it simple.
+    container.style.display = 'block';
+
+    if (container.getAttribute('data-loaded') !== 'true') {
+        const params = new URLSearchParams({
+            action: 'get_order_products',
+            order_number: orderNumber,
+            product_filter: '<?= $filters['product_filter'] ?? '' ?>'
+        });
+
+        fetch(`nhanvien_kpi.php?${params}`)
+            .then(r => r.json())
+            .then(result => {
+                if (result.success) {
+                    let phtml = '<table class="table table-sm table-borderless mb-0" style="font-size:0.75rem">';
+                    phtml += '<tr class="border-bottom"><th>Mã SP</th><th>Loại</th><th class="text-center">SL</th><th class="text-end">Tiền</th></tr>';
+                    result.data.forEach(p => {
+                        let amount = parseFloat(p.TotalNetAmount);
+                        if(isNaN(amount) || amount <= 0) amount = 5;
+                        phtml += `<tr>
+                            <td>${escapeHtml(p.ProductCode)}</td>
+                            <td class="text-center badge ${p.SaleType === 'S' ? 'bg-primary' : 'bg-warning text-dark'} p-0 px-1" style="font-size:0.6rem">${p.SaleType}</td>
+                            <td class="text-center">${p.Quantity}</td>
+                            <td class="text-end fw-bold">${formatMoney(amount)}</td>
+                        </tr>`;
+                    });
+                    phtml += '</table>';
+                    container.innerHTML = phtml;
+                    container.setAttribute('data-loaded', 'true');
+                } else {
+                    container.innerHTML = `<small class="text-danger">${result.error}</small>`;
+                }
+            });
+    }
 }
 
 function escapeHtml(text) {
@@ -507,6 +713,40 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Draggable Modal Logic (Vanilla JS)
+document.addEventListener('mousedown', function (e) {
+    const header = e.target.closest('.modal-header');
+    if (!header) return;
+    
+    const modalContent = header.closest('.modal-content');
+    if (!modalContent) return;
+    
+    // Check if we are clicking on Close button
+    if (e.target.closest('.btn-close')) return;
+
+    let initialX = e.clientX;
+    let initialY = e.clientY;
+    
+    const rect = modalContent.getBoundingClientRect();
+    let offsetX = initialX - rect.left;
+    let offsetY = initialY - rect.top;
+
+    function onMouseMove(e) {
+        modalContent.style.position = 'absolute';
+        modalContent.style.margin = '0';
+        modalContent.style.left = (e.clientX - offsetX) + 'px';
+        modalContent.style.top = (e.clientY - offsetY) + 'px';
+    }
+
+    function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+});
 
 function formatMoney(val) {
     return parseFloat(val).toLocaleString('vi-VN') + 'đ';

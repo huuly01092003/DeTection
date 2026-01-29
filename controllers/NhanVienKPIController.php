@@ -258,5 +258,27 @@ class NhanVienKPIController {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
+
+    /**
+     * ✅ AJAX: Lấy chi tiết sản phẩm của đơn hàng
+     */
+    public function getOrderProducts() {
+        header('Content-Type: application/json');
+        
+        $order_number = $_GET['order_number'] ?? '';
+        $product_filter = $_GET['product_filter'] ?? '';
+        
+        if (empty($order_number)) {
+            echo json_encode(['success' => false, 'error' => 'Missing order number']);
+            return;
+        }
+        
+        try {
+            $products = $this->model->getOrderProductDetails($order_number, $product_filter);
+            echo json_encode(['success' => true, 'data' => $products]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
 }
 ?>

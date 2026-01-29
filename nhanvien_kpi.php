@@ -20,7 +20,12 @@ switch ($action) {
         // Lấy chi tiết khách hàng nhân viên (AJAX)
         $controller->getEmployeeCustomers();
         break;
-        
+
+    case 'get_order_products':
+        // Lấy chi tiết sản phẩm của đơn hàng (AJAX)
+        $controller->getOrderProducts();
+        break;
+
     case 'report':
     default:
         // Hiển thị báo cáo KPI
