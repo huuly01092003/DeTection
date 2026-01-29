@@ -302,14 +302,20 @@ $isViewer = isViewer();
                     </div>
                     <div class="col-md-2">
                         <div class="kpi-card">
-                            <div class="kpi-value text-info"><?= number_format($statistics['total_orders']) ?></div>
-                            <div class="kpi-label">Tổng Đơn</div>
+                            <div class="kpi-value text-info" style="font-size: 1.2rem;"><?= number_format($statistics['total_gross']) ?></div>
+                            <div class="kpi-label">Tổng Gross (Tiền)</div>
                         </div>
                     </div>
                     <div class="col-md-2">
                         <div class="kpi-card">
-                            <div class="kpi-value text-success"><?= number_format($statistics['total_customers']) ?></div>
-                            <div class="kpi-label">Tổng Khách</div>
+                            <div class="kpi-value text-success" style="font-size: 1.2rem;"><?= number_format($statistics['total_scheme']) ?></div>
+                            <div class="kpi-label">Tổng KM (Tiền)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="kpi-card">
+                            <div class="kpi-value text-primary" style="font-size: 1.2rem;"><?= number_format($statistics['total_net']) ?></div>
+                            <div class="kpi-label">Tổng Net (Thực thu)</div>
                         </div>
                     </div>
                     <div class="col-md-2">
@@ -389,8 +395,13 @@ $isViewer = isViewer();
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-primary" 
                                             onclick='showDetail(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'>
-                                        <i class="fas fa-search"></i> Điều Tra Vi Phạm
+                                        <i class="fas fa-search"></i> Điều Tra (<?= intval($item['risk_score']) ?>đ)
                                     </button>
+                                    <div class="mt-1">
+                                        <?php foreach (array_slice($item['risk_reasons'], 0, 2) as $reason): ?>
+                                            <span class="badge border text-dark" style="font-size: 0.65rem; background: #f8f9fa;"><?= htmlspecialchars($reason) ?></span>
+                                        <?php endforeach; ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; else: ?>
@@ -426,6 +437,14 @@ $isViewer = isViewer();
 <script>
 // Hiển thị chi tiết vi phạm (Level 1)
 function showDetail(data) {
+
+    if (!data) {
+        alert('Không tìm thấy dữ liệu chi tiết cho ' + dsrCode + '! Vui lòng kiểm tra console (F12) để xem lỗi.');
+        console.error('Data missing for code:', dsrCode);
+        console.log('Available codes:', Object.keys(window.reportData));
+        return;
+    }
+
     document.getElementById('violationStaffName').textContent = data.ten_nv;
     
     const rb = data.risk_analysis.risk_breakdown || {};
@@ -471,19 +490,25 @@ function showDetail(data) {
             </div>
             <div class="col-md-9">
                 <div class="row g-2">
-                    <div class="col-4">
+                    <div class="col-3">
                         <div class="p-2 border rounded bg-white text-center shadow-sm">
                             <div class="small text-muted">Vượt Ngưỡng</div>
                             <div class="fw-bold text-danger">${Math.round(rb.threshold)}đ</div>
                         </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-3">
                         <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Thao Túng</div>
-                            <div class="fw-bold text-info">${Math.round(rb.efficiency)}đ</div>
+                            <div class="small text-muted">Chẻ/Gộp Đơn</div>
+                            <div class="fw-bold text-info">${Math.round(rb.splitting)}đ</div>
                         </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm">
+                            <div class="small text-muted">Lạm Dụng KM</div>
+                            <div class="fw-bold text-warning">${Math.round(rb.scheme)}đ</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
                         <div class="p-2 border rounded bg-white text-center shadow-sm">
                             <div class="small text-muted">Liên Tiếp</div>
                             <div class="fw-bold text-secondary">${Math.round(rb.consecutive)}đ</div>
@@ -505,8 +530,11 @@ function showDetail(data) {
                             <th>Ngày Phân Tích</th>
                             <th class="text-end">Khách hàng</th>
                             <th class="text-end">Đơn hàng</th>
-                            <th class="text-end">Tổng tiền ngày</th>
-                            <th class="text-end">AOV Ngày</th>
+                            <th class="text-end">Tiền Gross</th>
+                            <th class="text-end">Tiền KM</th>
+                            <th class="text-end">Thực Thu (Net)</th>
+                            <th class="text-end">AOV</th>
+                            <th class="text-end">Tỷ lệ KM</th>
                             <th>Lý do rủi ro</th>
                         </tr>
                     </thead>
@@ -523,11 +551,14 @@ function showDetail(data) {
                     <td><strong class="text-muted">${v.date}</strong></td>
                     <td class="text-end"><strong>${v.customers}</strong> KH</td>
                     <td class="text-end"><strong>${v.orders}</strong> Đơn</td>
+                    <td class="text-end text-muted">${formatMoney(v.day_gross)}</td>
+                    <td class="text-end text-success">${formatMoney(v.day_scheme)}</td>
                     <td class="text-end fw-bold text-dark">${formatMoney(v.total_amount)}</td>
                     <td class="text-end fw-bold text-primary">${formatMoney(v.day_aov)}</td>
+                    <td class="text-end fw-bold text-warning">${(v.day_scheme_rate * 100).toFixed(1)}%</td>
                     <td>
                         <div class="small">
-                            ${v.reasons.map(r => `<span class="badge bg-light text-dark border me-1">${r}</span>`).join('')}
+                            ${v.reasons.map(r => `<span class="badge ${r.includes('✂️') ? 'bg-info' : (r.includes('💰') ? 'bg-warning text-dark' : 'bg-light text-dark')} border me-1">${r}</span>`).join('')}
                         </div>
                     </td>
                 </tr>
@@ -616,8 +647,8 @@ function renderInlineCustomers(container, customers) {
         
         html += `
             <div class="border-bottom py-3">
-                <div class="row align-items-start">
-                    <div class="col-md-8">
+                <div class="row">
+                    <div class="col-md-7">
                         <div class="d-flex align-items-center mb-1">
                             <div class="fw-bold text-dark h6 mb-0">${escapeHtml(c.customer_name)}</div>
                             <small class="text-muted ms-2">[${c.CustCode}]</small>
@@ -631,9 +662,25 @@ function renderInlineCustomers(container, customers) {
                         </div>
                         ${gkhlHtml}
                     </div>
-                    <div class="col-md-4 text-end">
-                        <div class="fw-bold text-success h5 mb-0">${formatMoney(c.total_amount)}</div>
-                        <div class="small text-muted">${c.order_count} đơn hàng</div>
+                    <div class="col-md-5 text-end">
+                        <div class="fw-bold text-dark h5 mb-1">${formatMoney(c.total_amount)}</div>
+                        <div class="small text-muted mb-2">Đơn quét: Gross ${formatMoney(c.total_gross)} | KM ${formatMoney(c.total_scheme)}</div>
+                        
+                        <div class="p-2 rounded border bg-light d-inline-block text-start" style="font-size: 0.7rem; min-width: 200px;">
+                            <div class="text-muted fw-bold border-bottom mb-1 pb-1">THỐNG KÊ LŨY KẾ THÁNG (MTD)</div>
+                            <div class="d-flex justify-content-between">
+                                <span>Thực thu (Net):</span>
+                                <span class="fw-bold text-primary">${formatMoney(c.mtd_net)}</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Tiền hàng (Gross):</span>
+                                <span class="text-dark">${formatMoney(c.mtd_gross)}</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Khuyến mãi:</span>
+                                <span class="text-success">${formatMoney(c.mtd_scheme)}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-2 text-nowrap overflow-auto pb-1" style="max-width: 100%;">
@@ -644,7 +691,7 @@ function renderInlineCustomers(container, customers) {
                 const orderId = `order-${cIdx}-${oIdx}-${Math.random().toString(36).substr(2, 5)}`;
                 html += `
                     <div class="d-inline-block me-2">
-                        <span class="order-chip pointer mb-1" onclick="toggleOrderProducts('${orderId}', '${o.order_number}')">
+                        <span class="order-chip pointer mb-1" onclick="toggleOrderProducts('${orderId}', '${o.order_number}')" title="Gross: ${formatMoney(o.gross)} | KM: ${formatMoney(o.scheme)}">
                             <i class="fas fa-file-invoice me-1"></i>${o.order_number} (${formatMoney(o.amount)})
                         </span>
                         <div id="${orderId}" class="order-products-container border border-secondary shadow-sm">
@@ -682,14 +729,17 @@ function toggleOrderProducts(elementId, orderNumber) {
             .then(result => {
                 if (result.success) {
                     let phtml = '<table class="table table-sm table-borderless mb-0" style="font-size:0.75rem">';
-                    phtml += '<tr class="border-bottom"><th>Mã SP</th><th>Loại</th><th class="text-center">SL</th><th class="text-end">Tiền</th></tr>';
+                    phtml += '<tr class="border-bottom"><th>Mã SP</th><th>Loại</th><th class="text-center">SL</th><th class="text-end">Gross</th><th class="text-end">KM</th><th class="text-end">Net</th></tr>';
                     result.data.forEach(p => {
                         let amount = parseFloat(p.TotalNetAmount);
-                        if(isNaN(amount) || amount <= 0) amount = 5;
+                        let gross = parseFloat(p.TotalGrossAmount || 0);
+                        let scheme = parseFloat(p.TotalSchemeAmount || 0);
                         phtml += `<tr>
                             <td>${escapeHtml(p.ProductCode)}</td>
                             <td class="text-center badge ${p.SaleType === 'S' ? 'bg-primary' : 'bg-warning text-dark'} p-0 px-1" style="font-size:0.6rem">${p.SaleType}</td>
                             <td class="text-center">${p.Quantity}</td>
+                            <td class="text-end">${formatMoney(gross)}</td>
+                            <td class="text-end text-success">${formatMoney(scheme)}</td>
                             <td class="text-end fw-bold">${formatMoney(amount)}</td>
                         </tr>`;
                     });
@@ -745,7 +795,9 @@ document.addEventListener('mousedown', function (e) {
 });
 
 function formatMoney(val) {
-    return parseFloat(val).toLocaleString('vi-VN') + 'đ';
+    const n = parseFloat(val);
+    if (isNaN(n)) return '0đ';
+    return n.toLocaleString('vi-VN') + 'đ';
 }
 </script>
 

@@ -120,6 +120,9 @@ class NhanVienKPIController {
                     'employees_with_orders' => 0,
                     'total_orders' => 0,
                     'total_customers' => 0,
+                    'total_gross' => 0,
+                    'total_scheme' => 0,
+                    'total_net' => 0,
                     'total_amount' => 0,
                     'avg_orders_per_emp' => 0,
                     'avg_customers_per_emp' => 0,
@@ -148,21 +151,26 @@ class NhanVienKPIController {
             
             foreach ($employees as &$emp_kpi) {
                 $reasons = [];
+                $analysis = $emp_kpi['risk_analysis'];
                 
                 if ($emp_kpi['violation_count'] > 0) {
-                    $reasons[] = "Vi phạm ngưỡng {$emp_kpi['violation_count']} ngày ({$emp_kpi['risk_analysis']['violation_rate']}% thời gian)";
+                    $reasons[] = "Vi phạm ngưỡng {$emp_kpi['violation_count']} ngày";
                 }
                 
-                if ($emp_kpi['risk_analysis']['max_violation'] > 0) {
-                    $reasons[] = "Vượt tối đa {$emp_kpi['risk_analysis']['max_violation']} khách so với ngưỡng";
+                if ($analysis['multi_order_customers_total'] > 0) {
+                    $reasons[] = "✂️ Phát hiện chẻ đơn (" . $analysis['multi_order_customers_total'] . " trường hợp)";
                 }
                 
-                if ($emp_kpi['risk_analysis']['consecutive_violations'] >= 3) {
-                    $reasons[] = "Vi phạm liên tục {$emp_kpi['risk_analysis']['consecutive_violations']} ngày";
+                if ($analysis['risk_breakdown']['scheme'] > 0) {
+                    $reasons[] = "💰 Lạm dụng KM (" . $emp_kpi['scheme_rate'] . "%)";
+                }
+                
+                if ($analysis['consecutive_violations'] >= 3) {
+                    $reasons[] = "Vi phạm liên tục {$analysis['consecutive_violations']} ngày";
                 }
                 
                 if (empty($reasons)) {
-                    $reasons[] = "Hoạt động trong ngưỡng cho phép";
+                    $reasons[] = "Hoạt động bình thường";
                 }
                 
                 $emp_kpi['risk_reasons'] = $reasons;
@@ -186,6 +194,9 @@ class NhanVienKPIController {
                 'employees_with_orders' => $emp_count,
                 'total_orders' => $total_orders,
                 'total_customers' => $total_customers,
+                'total_gross' => $system_metrics['total_gross'] ?? 0,
+                'total_scheme' => $system_metrics['total_scheme'] ?? 0,
+                'total_net' => $system_metrics['total_net'] ?? 0,
                 'total_amount' => $total_amount,
                 'avg_orders_per_emp' => round($avg_orders_per_emp, 2),
                 'avg_customers_per_emp' => round($avg_customers_per_emp, 2),
@@ -223,6 +234,9 @@ class NhanVienKPIController {
                 'employees_with_orders' => 0,
                 'total_orders' => 0,
                 'total_customers' => 0,
+                'total_gross' => 0,
+                'total_scheme' => 0,
+                'total_net' => 0,
                 'total_amount' => 0,
                 'avg_orders_per_emp' => 0,
                 'avg_customers_per_emp' => 0,

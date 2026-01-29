@@ -119,27 +119,124 @@ class NhanVienKPIModel {
         $results = [];
         
         // ✅ 3. Lấy TOÀN BỘ thống kê hàng ngày cho TOÀN BỘ nhân viên (sử dụng index hints)
-        $sql2 = "SELECT 
-                    o.DSRCode,
-                    o.OrderDate as order_date,
-                    COUNT(DISTINCT o.OrderNumber) as daily_orders,
-                    COUNT(DISTINCT o.CustCode) as daily_customers,
-                    SUM(o.TotalNetAmount) as daily_amount
-                FROM orderdetail o
-                WHERE o.OrderDate >= ? AND o.OrderDate <= ?
-                " . $rpt_where . "
-                " . (!empty($product_filter) ? "AND o.ProductCode LIKE ?" : "") . "
-                GROUP BY o.DSRCode, o.OrderDate
-                ORDER BY o.DSRCode, o.OrderDate";
+        // PHÒNG CHỐNG LỖI "MySQL server has gone away": Tăng timeout và đơn giản hóa truy vấn
+        try {
+            $this->conn->exec("SET SESSION wait_timeout=600");
+            $this->conn->exec("SET SESSION interactive_timeout=600");
+            $this->conn->exec("SET SESSION max_allowed_packet=67108864");
+        } catch (Exception $e) { /* Ignore error if session set fails */ }
+
+        // Truy vấn 1: Lấy các số liệu tổng hợp cơ bản (nhẹ hơn)
+        $sqlBasic = "SELECT 
+                        o.DSRCode,
+                        o.OrderDate as order_date,
+                        COUNT(DISTINCT o.OrderNumber) as daily_orders,
+                        COUNT(DISTINCT o.CustCode) as daily_customers,
+                        SUM(o.TotalGrossAmount) as daily_gross,
+                        SUM(o.TotalSchemeAmount) as daily_scheme,
+                        SUM(o.TotalNetAmount) as daily_amount
+                    FROM orderdetail o
+                    WHERE o.OrderDate >= ? AND o.OrderDate <= ?
+                    " . $rpt_where . "
+                    " . (!empty($product_filter) ? "AND o.ProductCode LIKE ?" : "") . "
+                    GROUP BY o.DSRCode, o.OrderDate";
         
-        $params2 = array_merge([$tu_ngay, $den_ngay], $rpt_params);
-        if (!empty($product_filter)) {
-            $params2[] = $product_filter . '%';
+        $paramsBasic = array_merge([$tu_ngay, $den_ngay], $rpt_params);
+        if (!empty($product_filter)) { $paramsBasic[] = $product_filter . '%'; }
+        
+        $stmt1 = $this->conn->prepare($sqlBasic);
+        $stmt1->execute($paramsBasic);
+        $basicData = $stmt1->fetchAll(PDO::FETCH_ASSOC);
+
+        // Truy vấn 2: Lấy thông tin chẻ đơn (đếm khách hàng có nhiều đơn/ngày) - Truy vấn này thường nặng, xử lý riêng
+        $sqlMulti = "SELECT DSRCode, OrderDate, COUNT(*) as multi_order_customers
+                     FROM (
+                        SELECT o.DSRCode, o.OrderDate, o.CustCode
+                        FROM orderdetail o
+                        WHERE o.OrderDate >= ? AND o.OrderDate <= ?
+                        " . $rpt_where . "
+                        " . (!empty($product_filter) ? "AND o.ProductCode LIKE ?" : "") . "
+                        GROUP BY o.DSRCode, o.OrderDate, o.CustCode
+                        HAVING COUNT(DISTINCT o.OrderNumber) > 1
+                     ) t
+                     GROUP BY DSRCode, OrderDate";
+        
+        $stmt2 = $this->conn->prepare($sqlMulti);
+        $stmt2->execute($paramsBasic);
+        $multiData = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+        // Gộp dữ liệu trong PHP (tiết kiệm tài nguyên server MySQL)
+        $multiOrderMap = [];
+        foreach ($multiData as $md) {
+            $multiOrderMap[$md['DSRCode']][$md['OrderDate']] = $md['multi_order_customers'];
         }
+
+        $allDailyData = [];
+        foreach ($basicData as $bd) {
+            $bd['multi_order_customers'] = $multiOrderMap[$bd['DSRCode']][$bd['order_date']] ?? 0;
+            $allDailyData[] = $bd;
+        }
+
+
+        // --- MỚI: TÍNH TOÁN GKHL CHÍNH XÁC (MTD context) ---
+        // Lấy ngày đầu tháng của ngày bắt đầu báo cáo
+        $first_of_month = date('Y-m-01', strtotime($tu_ngay));
+        $day_before_start = date('Y-m-d', strtotime($tu_ngay . ' -1 day'));
         
-        $stmt2 = $this->conn->prepare($sql2);
-        $stmt2->execute($params2);
-        $allDailyData = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        $customerRunningNet = []; // Lũy kế doanh số cho mỗi khách hàng
+
+        // Bước 1: Lấy doanh số 'nền' từ đầu tháng đến trước ngày bắt đầu báo cáo
+        // ✅ OPTIMIZED: Chỉ lấy khách hàng CÓ trong danh sách GKHL & sử dụng Rpt params
+        if ($day_before_start >= $first_of_month) {
+            $sqlBaseNet = "SELECT o.CustCode, SUM(o.TotalNetAmount) as base_net 
+                           FROM orderdetail o
+                           JOIN gkhl g ON o.CustCode = g.MaKHDMS
+                           WHERE o.OrderDate >= ? AND o.OrderDate <= ? 
+                           " . $rpt_where . "
+                           GROUP BY o.CustCode";
+            
+            $baseParams = array_merge([$first_of_month, $day_before_start], $rpt_params);
+            
+            $stmtBase = $this->conn->prepare($sqlBaseNet);
+            $stmtBase->execute($baseParams);
+            while ($row = $stmtBase->fetch(PDO::FETCH_ASSOC)) {
+                $customerRunningNet[$row['CustCode']] = floatval($row['base_net']);
+            }
+        }
+
+        // Truy vấn 3: Lấy dữ liệu chốt số GKHL (Tính toán thông minh qua PHP để tránh timeout)
+        $sqlGKHL = "SELECT o.DSRCode, o.OrderDate, o.CustCode, SUM(o.TotalNetAmount) as day_net, MAX(g.DangKyMucDoanhSo) as gk_limit
+                    FROM orderdetail o
+                    JOIN gkhl g ON o.CustCode = g.MaKHDMS
+                    WHERE o.OrderDate >= ? AND o.OrderDate <= ?
+                    " . $rpt_where . "
+                    " . (!empty($product_filter) ? "AND o.ProductCode LIKE ?" : "") . "
+                    GROUP BY o.DSRCode, o.OrderDate, o.CustCode";
+        
+        $stmt3 = $this->conn->prepare($sqlGKHL);
+        $stmt3->execute($paramsBasic);
+        $gkhlData = $stmt3->fetchAll(PDO::FETCH_ASSOC);
+
+        $gkhlAchieverMap = [];
+        $customerRunningNet = []; // Defined this back as simpler version if needed, or just let loop handle it
+        foreach ($gkhlData as $gd) {
+            $cust = $gd['CustCode'];
+            $limitStr = $gd['gk_limit'];
+            
+            // XỬ LÝ ĐỊNH MỨC: Loại bỏ dấu phẩy
+            $cleanLimit = preg_replace('/[^0-9]/', '', $limitStr);
+            $limit = floatval($cleanLimit);
+            
+            if ($limit <= 0) continue;
+
+            $prevNet = $customerRunningNet[$cust] ?? 0;
+            $currNet = $prevNet + floatval($gd['day_net']);
+            $customerRunningNet[$cust] = $currNet;
+
+            if ($prevNet < $limit && $currNet >= $limit) {
+                $gkhlAchieverMap[$gd['DSRCode']][$gd['OrderDate']] = ($gkhlAchieverMap[$gd['DSRCode']][$gd['OrderDate']] ?? 0) + 1;
+            }
+        }
 
         // Gom nhóm dữ liệu theo nhân viên trong memory
         $groupedDailyData = [];
@@ -158,9 +255,16 @@ class NhanVienKPIModel {
             $daily_orders = [];
             $daily_customers = [];
             $daily_amounts = [];
+            $daily_grosses = [];
+            $daily_schemes = [];
+            $daily_multi_cust = [];
+            $daily_gkhl_achievers = [];
+            
             $total_orders = 0;
             $total_customers = 0;
             $total_amount = 0;
+            $total_gross = 0;
+            $total_scheme = 0;
             $max_customers = 0;
             
             foreach ($dailyData as $day) {
@@ -168,10 +272,16 @@ class NhanVienKPIModel {
                 $daily_orders[] = intval($day['daily_orders']);
                 $daily_customers[] = intval($day['daily_customers']);
                 $daily_amounts[] = floatval($day['daily_amount']);
+                $daily_grosses[] = floatval($day['daily_gross'] ?? 0);
+                $daily_schemes[] = floatval($day['daily_scheme']);
+                $daily_multi_cust[] = intval($day['multi_order_customers']);
+                $daily_gkhl_achievers[] = $gkhlAchieverMap[$dsrCode][$day['order_date']] ?? 0;
                 
                 $total_orders += intval($day['daily_orders']);
                 $total_customers += intval($day['daily_customers']);
                 $total_amount += floatval($day['daily_amount']);
+                $total_gross += floatval($day['daily_gross'] ?? 0);
+                $total_scheme += floatval($day['daily_scheme']);
                 $max_customers = max($max_customers, intval($day['daily_customers']));
             }
             
@@ -193,6 +303,8 @@ class NhanVienKPIModel {
                 'total_orders' => $total_orders,
                 'total_customers' => $total_customers,
                 'total_amount' => $total_amount,
+                'total_gross' => $total_gross,
+                'total_scheme' => $total_scheme,
                 'working_days' => $working_days,
                 'max_day_customers' => $max_customers,
                 'max_day_orders' => max($daily_orders ?: [0]),
@@ -201,13 +313,26 @@ class NhanVienKPIModel {
                 'daily_orders' => $daily_orders,
                 'daily_customers' => $daily_customers,
                 'daily_amounts' => $daily_amounts,
+                'daily_schemes' => $daily_schemes,
+                'daily_multi_cust' => $daily_multi_cust,
                 'avg_daily_orders' => $working_days > 0 ? round($total_orders / $working_days, 2) : 0,
                 'avg_daily_amount' => $working_days > 0 ? round($total_amount / $working_days, 0) : 0,
                 'avg_daily_customers' => $working_days > 0 ? round($total_customers / $working_days, 2) : 0,
+                'scheme_rate' => $total_amount > 0 ? round(($total_scheme / $total_amount) * 100, 1) : 0,
             ];
             
             // Phân tích risk nâng cao
-            $row['risk_analysis'] = $this->analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates, $daily_amounts, $daily_orders);
+            $row['risk_analysis'] = $this->analyzeRiskByThreshold(
+                $daily_customers, 
+                $threshold_n, 
+                $daily_dates, 
+                $daily_amounts,   // Tiền thực thu (Net) -> index 3
+                $daily_orders,    // Số lượng đơn -> index 4
+                $daily_schemes,   // Tiền KM -> index 5
+                $daily_multi_cust,// Chẻ đơn -> index 6
+                $daily_grosses,   // Tiền hàng -> index 7
+                $daily_gkhl_achievers // Khách chốt GKHL -> index 8
+            );
             $row['risk_score'] = $row['risk_analysis']['risk_score'];
             $row['risk_level'] = $row['risk_analysis']['risk_level'];
             $row['violation_days'] = $row['risk_analysis']['violation_days'];
@@ -261,6 +386,14 @@ class NhanVienKPIModel {
                 elseif ($item['risk_level'] === 'warning') $warningCount++;
             }
             
+            // Tối ưu dữ liệu lưu vào DB (bỏ các chi tiết quá nặng không cần thiết cho việc hiển thị danh sách)
+            $dbData = array_map(function($item) {
+                // Giữ lại các trường summary quan trọng, bỏ violation_days quá chi tiết
+                unset($item['orders']); // Bỏ danh sách đơn hàng
+                // Giữ lại cấu trúc risk_analysis nhưng có thể rút gọn nội dung text dài nếu cần
+                return $item;
+            }, $data);
+
             $sql = "INSERT INTO summary_nhanvien_kpi_cache 
                     (cache_key, tu_ngay, den_ngay, product_filter, threshold_n, data, employee_count, critical_count, warning_count)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -271,6 +404,9 @@ class NhanVienKPIModel {
                     warning_count = VALUES(warning_count),
                     calculated_at = CURRENT_TIMESTAMP";
             
+            // Tăng giới hạn gói tin cho việc save cache
+            $this->conn->exec("SET SESSION max_allowed_packet=67108864");
+            
             $stmt = $this->conn->prepare($sql);
             $stmt->execute([
                 $cacheKey,
@@ -278,7 +414,7 @@ class NhanVienKPIModel {
                 $den_ngay,
                 $product_filter ?: null,
                 $threshold_n,
-                json_encode($data, JSON_UNESCAPED_UNICODE),
+                json_encode($dbData, JSON_UNESCAPED_UNICODE),
                 count($data),
                 $criticalCount,
                 $warningCount
@@ -303,130 +439,185 @@ class NhanVienKPIModel {
         }
     }
 
-    /**
-     * ✅ PHÂN TÍCH RỦI RO NÂNG CAO (Advanced KPI Logic)
-     * 1. Threshold Violation: Vi phạm ngưỡng tuyệt đối.
-     * 2. Statistical Anomaly (Z-Score): Bất thường so với chính mình.
-     * 3. Efficiency Decline: Doanh số TB/khách thấp bất thường vào ngày có nhiều khách (Filler orders).
-     * 4. Consecutive Violations: Vi phạm liên tiếp.
-     */
-    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = [], $daily_orders = []) {
+    private function analyzeRiskByThreshold($daily_customers, $threshold_n, $daily_dates = [], $daily_amounts = [], $daily_orders = [], $daily_schemes = [], $daily_multi_cust = [], $daily_grosses = [], $daily_gkhl_achievers = []) {
         $total_days = count($daily_customers);
         if ($total_days < 3) return $this->emptyRiskResult();
 
-        // 1. TÍNH TOÁN THỐNG KÊ ROBUST (Median, MAD, Percentile) - Dùng bản sao để không hỏng index
+        // 1. TÍNH TOÁN THỐNG KÊ ROBUST
         $sorted_cust = $daily_customers;
         sort($sorted_cust);
         $median = $this->calculateMedian($sorted_cust);
-        $mad = $this->calculateMAD($sorted_cust, $median);
         $p80 = $this->getPercentile($sorted_cust, 80);
         
-        $adaptive_n = max($threshold_n, ceil($median * 1.5), ceil($p80));
+        // Theo yêu cầu người dùng: Ngưỡng N (Input) là ưu tiên số 1 để rà soát
+        $adaptive_n = $threshold_n; 
+        
+        // Vẫn tính statistical_n để tham khảo nếu muốn đánh giá độ lệch (nhưng không dùng làm ngưỡng chính)
+        $statistical_n = max($threshold_n, ceil($median * 1.5), ceil($p80));
 
-        // Baseline AOV trung vị (Dùng bản sao để tính)
+        // Baseline AOV trung vị
         $temp_aovs = [];
         foreach ($daily_customers as $idx => $count) {
             if ($count > 0) $temp_aovs[] = ($daily_amounts[$idx] ?? 0) / $count;
         }
         $baseline_aov = $this->calculateMedian($temp_aovs);
 
+        // Baseline Scheme Rate trung vị
+        $temp_scheme_rates = [];
+        foreach ($daily_amounts as $idx => $amt) {
+            if ($amt > 0) $temp_scheme_rates[] = ($daily_schemes[$idx] ?? 0) / $amt;
+        }
+        $baseline_scheme_rate = $this->calculateMedian($temp_scheme_rates);
+
         $violation_days = [];
-        $suspicious_indices = []; // Track any day with suspicious behavior for streak
+        $suspicious_indices = [];
         $violation_count = 0;
         $max_excess_ratio = 0;
+        $total_multi_cust = array_sum($daily_multi_cust);
 
         foreach ($daily_customers as $idx => $count) {
             $day_amount = $daily_amounts[$idx] ?? 0;
+            $day_scheme = $daily_schemes[$idx] ?? 0;
             $day_aov = $count > 0 ? ($day_amount / $count) : 0;
+            $day_scheme_rate = $day_amount > 0 ? ($day_scheme / $day_amount) : 0;
+            $day_multi_cust = $daily_multi_cust[$idx] ?? 0;
             
-            // 1. Phân loại hành vi
+            // --- NHẬN DIỆN CÁC BIỂU HIỆN BẤT THƯỜNG ---
+            
+            // 1. Vượt ngưỡng (KPI Pressure)
             $is_threshold_violation = ($count > $adaptive_n);
-            $is_splitting = ($count > $median * 1.3 && $day_aov < $baseline_aov * 0.4);
-            $is_consolidation = ($day_aov > $baseline_aov * 2.5 && $count < $median * 0.7 && $count > 0);
             
-            // 2. Phát hiện xen kẽ (So với ngày hôm trước) - Biến động cực lớn
+            // 2. Chẻ đơn (Bằng chứng: 1 khách nhiều đơn/ngày HOẶC AOV quá thấp)
+            $is_splitting = ($day_multi_cust > 0) || ($count > $median * 1.5 && $day_aov < $baseline_aov * 0.4);
+            
+            // 3. Gộp đơn (Bằng chứng: AOV cao đột biến + số khách rất ít)
+            // Tinh chỉnh: Giảm xuống 2x baseline AOV và nới lỏng số lượng khách
+            $is_consolidation = ($day_aov > $baseline_aov * 2.0 && $count < max(3, $median * 0.7) && $count > 0);
+            
+            // 4. Thao túng khuyến mãi (Bằng chứng: Tỷ lệ KM cao bất thường)
+            $is_scheme_abusing = ($day_scheme_rate > $baseline_scheme_rate * 1.8 && $day_scheme_rate > 0.08);
+
+            // 5. Biến động cực đại (Alternating behavior - "Răng cưa")
             $is_alternating = false;
             if ($idx > 0) {
                 $prev_count = $daily_customers[$idx-1];
-                if (abs($count - $prev_count) > ($median * 1.2)) {
-                    $is_alternating = true;
+                if (abs($count - $prev_count) > max(3, $median * 1.2)) $is_alternating = true;
+            }
+
+            // 6. Chốt số GKHL đột ngột (Theo chu kỳ rà soát 13-17 và 26-31)
+            $is_gkhl_achieving = false;
+            $achievers_this_day = $daily_gkhl_achievers[$idx] ?? 0;
+            if ($achievers_this_day > 0) {
+                // Kiểm tra ngày dương lịch
+                $current_date = $daily_dates[$idx]; // Format Y-m-d
+                $day_parts = explode('-', $current_date);
+                $day_num = isset($day_parts[2]) ? (int)$day_parts[2] : 0;
+                
+                // Chu kỳ rà soát: 13-17 và 26-31
+                $is_review_window = ($day_num >= 13 && $day_num <= 17) || ($day_num >= 26);
+                
+                if ($is_review_window) {
+                    $is_gkhl_achieving = true;
                 }
             }
 
-            if ($is_threshold_violation || $is_splitting || $is_consolidation || $is_alternating) {
+            if ($is_threshold_violation || $is_splitting || $is_consolidation || $is_scheme_abusing || $is_alternating || $is_gkhl_achieving) {
                 $reasons = [];
-                if ($count > $adaptive_n * 2) $reasons[] = "Vượt ngưỡng đột xuất (Gấp 2)";
-                elseif ($is_threshold_violation) $reasons[] = "Vượt ngưỡng thích ứng (N=" . $adaptive_n . ")";
+                if ($is_threshold_violation) {
+                    $ratio = round($count / $adaptive_n, 1);
+                    if ($ratio >= 2) {
+                        $reasons[] = "🎁 Vượt ngưỡng đột xuất (Gấp " . $ratio . ")";
+                    } else {
+                        $reasons[] = "📈 Vượt ngưỡng (" . $count . "/" . $adaptive_n . ")";
+                    }
+                }
                 
-                if ($is_splitting) $reasons[] = "Nghi vấn chẻ đơn (AOV thấp)";
-                if ($is_consolidation) $reasons[] = "Nghi vấn gộp đơn (AOV cao)";
-                if ($is_alternating) $reasons[] = "Dấu hiệu xen kẽ (Biến động)";
+                if ($day_multi_cust > 0) {
+                    $reasons[] = "✂️ Chẻ đơn: " . $day_multi_cust . " khách có >1 đơn/ngày";
+                } elseif ($is_splitting) {
+                    $reasons[] = "✂️ Nghi vấn chẻ đơn (AOV thấp)";
+                }
+
+                if ($is_consolidation) $reasons[] = "📦 Nghi vấn gộp đơn (AOV cực cao)";
+                if ($is_scheme_abusing) $reasons[] = "💰 Lạm dụng khuyến mãi (" . round($day_scheme_rate * 100, 1) . "%)";
+                if ($is_gkhl_achieving) $reasons[] = "🎯 Chốt số GKHL (" . $daily_gkhl_achievers[$idx] . " KH)";
+                if ($is_alternating) $reasons[] = "⚖️ Biến động khách hàng (Ngày trước/sau lệch lớn)";
 
                 if ($is_threshold_violation) $violation_count++;
                 $suspicious_indices[] = $idx;
-                
                 $max_excess_ratio = max($max_excess_ratio, $count / max(1, $adaptive_n));
 
                 $violation_days[] = [
                     'date' => $daily_dates[$idx] ?? "Ngày $idx",
                     'customers' => $count,
                     'orders' => $daily_orders[$idx] ?? 0,
+                    'multi_cust' => $day_multi_cust,
                     'threshold' => $adaptive_n,
-                    'z_score' => 0, 
                     'day_aov' => $day_aov,
-                    'baseline_aov' => $baseline_aov,
+                    'day_scheme_rate' => $day_scheme_rate,
+                    'day_gross' => $daily_grosses[$idx] ?? 0,
+                    'day_scheme' => $day_scheme,
                     'total_amount' => $day_amount,
                     'reasons' => $reasons,
-                    'is_critical' => $is_threshold_violation && ($count > $adaptive_n * 1.5)
+                    'is_critical' => ($is_threshold_violation && $count > $adaptive_n * 1.8) || ($day_multi_cust > 2) || ($is_splitting && $is_scheme_abusing)
                 ];
             }
         }
 
         // 2. TÍNH ĐIỂM RISK (0-100)
-        $risk_scores = ['threshold' => 0, 'behavioral' => 0, 'consecutive' => 0];
+        $risk_scores = ['threshold' => 0, 'splitting' => 0, 'scheme' => 0, 'consecutive' => 0];
 
-        // A. Điểm vượt ngưỡng (Max 50đ)
+        // A. Điểm vượt ngưỡng (Max 50đ, Min 20đ nếu vi phạm)
+        // Yêu cầu: Min 20, Max 50.
         if ($violation_count > 0) {
-            if ($max_excess_ratio >= 3) $risk_scores['threshold'] = 50;
-            elseif ($max_excess_ratio >= 2) $risk_scores['threshold'] = 40;
-            elseif ($max_excess_ratio >= 1.5) $risk_scores['threshold'] = 30;
-            else $risk_scores['threshold'] = 20;
+            // Cơ chế: Bắt đầu từ 20đ, cộng thêm 10đ cho mỗi hệ số vượt (max 50)
+            $threshold_score = 20 + round(($max_excess_ratio - 1) * 10);
+            $risk_scores['threshold'] = max(20, min(50, $threshold_score));
         }
 
-        // B. Điểm hành vi thao túng (Max 40đ)
-        $behavioral_days = array_filter($violation_days, fn($v) => array_intersect(["Nghi vấn chẻ đơn (AOV thấp)", "Nghi vấn gộp đơn (AOV cao)", "Dấu hiệu xen kẽ (Biến động)"], $v['reasons']));
-        if (count($behavioral_days) > 0) {
-            $risk_scores['behavioral'] = min(40, count($behavioral_days) * 15);
+        // B. Điểm chẻ đơn/gộp đơn (Max 20đ)
+        $splitting_score = 0;
+        foreach ($violation_days as $vd) {
+            foreach ($vd['reasons'] as $r) {
+                if (strpos($r, "✂️") !== false) $splitting_score += 10;
+                if (strpos($r, "📦") !== false) $splitting_score += 10;
+            }
         }
+        $risk_scores['splitting'] = min(20, $splitting_score);
 
-        // C. Điểm liên tiếp (Max 10đ) - Tính streak dựa trên suspicious_indices
+        // C. Điểm lạm dụng khuyến mãi (Max 20đ)
+        $scheme_score = 0;
+        foreach ($violation_days as $vd) {
+            foreach ($vd['reasons'] as $r) {
+                if (strpos($r, "💰") !== false) $scheme_score += 10;
+                if (strpos($r, "🎯") !== false) $scheme_score += 10;
+            }
+        }
+        $risk_scores['scheme'] = min(20, $scheme_score);
+
+        // E. Điểm liên tiếp (Max 10đ)
         $streak = 0;
         if (!empty($suspicious_indices)) {
-            $current_streak = 1;
-            $max_streak = 1;
+            $current_streak = 1; $max_streak = 1;
             for ($i = 1; $i < count($suspicious_indices); $i++) {
                 if ($suspicious_indices[$i] == $suspicious_indices[$i-1] + 1) {
                     $current_streak++;
                     $max_streak = max($max_streak, $current_streak);
-                } else {
-                    $current_streak = 1;
-                }
+                } else $current_streak = 1;
             }
             $streak = $max_streak;
         }
-
-        if ($streak >= 4) $risk_scores['consecutive'] = 10;
-        elseif ($streak >= 3) $risk_scores['consecutive'] = 7;
-        elseif ($streak >= 2) $risk_scores['consecutive'] = 3;
+        $risk_scores['consecutive'] = ($streak >= 4) ? 10 : (($streak >= 2) ? 5 : 0);
 
         $total_score = min(100, array_sum($risk_scores));
 
         return [
             'risk_score' => $total_score,
-            'risk_level' => $total_score >= 80 ? 'critical' : ($total_score >= 40 ? 'warning' : 'normal'),
+            'risk_level' => $total_score >= 75 ? 'critical' : ($total_score >= 35 ? 'warning' : 'normal'),
             'risk_breakdown' => [
                 'threshold' => $risk_scores['threshold'],
-                'efficiency' => $risk_scores['behavioral'], // Ánh xạ lại vào view hiện tại
+                'splitting' => $risk_scores['splitting'],
+                'scheme' => $risk_scores['scheme'],
                 'consecutive' => $risk_scores['consecutive']
             ],
             'violation_count' => $violation_count,
@@ -434,13 +625,14 @@ class NhanVienKPIModel {
             'violation_rate' => round(($violation_count / max(1, $total_days)) * 100, 1),
             'max_violation' => max(0, ceil($max_excess_ratio * $adaptive_n) - $adaptive_n),
             'consecutive_violations' => $streak,
+            'multi_order_customers_total' => $total_multi_cust,
             'violation_days' => $violation_days,
             'stats' => [
                 'median_cust' => $median,
-                'mad' => round($mad, 1),
                 'p80' => $p80,
                 'adaptive_n' => $adaptive_n,
-                'baseline_aov' => $baseline_aov
+                'baseline_aov' => $baseline_aov,
+                'baseline_scheme_rate' => $baseline_scheme_rate
             ]
         ];
     }
@@ -477,8 +669,8 @@ class NhanVienKPIModel {
             'risk_level' => 'normal',
             'risk_breakdown' => [
                 'threshold' => 0,
-                'statistical' => 0,
-                'efficiency' => 0,
+                'splitting' => 0,
+                'scheme' => 0,
                 'consecutive' => 0
             ],
             'violation_count' => 0,
@@ -486,13 +678,14 @@ class NhanVienKPIModel {
             'violation_rate' => 0,
             'max_violation' => 0,
             'consecutive_violations' => 0,
+            'multi_order_customers_total' => 0,
             'violation_days' => [],
             'stats' => [
                 'median_cust' => 0,
-                'mad' => 0,
                 'p80' => 0,
                 'adaptive_n' => 5,
-                'baseline_aov' => 0
+                'baseline_aov' => 0,
+                'baseline_scheme_rate' => 0
             ]
         ];
     }
@@ -514,6 +707,7 @@ class NhanVienKPIModel {
     }
 
     public function getEmployeeCustomerDetails($dsr_code, $tu_ngay, $den_ngay, $product_filter = '') {
+        $first_of_month = date('Y-m-01', strtotime($den_ngay));
         $sql = "SELECT 
                     CustCode,
                     customer_name,
@@ -524,9 +718,15 @@ class NhanVienKPIModel {
                     customer_group,
                     is_gkhl,
                     gkhl_types,
+                    gk_limit,
                     COUNT(OrderNumber) as order_count,
+                    SUM(OrderGross) as total_gross,
+                    SUM(OrderScheme) as total_scheme,
                     SUM(OrderAmount) as total_amount,
-                    GROUP_CONCAT(order_str SEPARATOR '||') as orders_raw
+                    GROUP_CONCAT(order_str SEPARATOR '||') as orders_raw,
+                    (SELECT SUM(TotalGrossAmount) FROM orderdetail WHERE CustCode = sub.CustCode AND OrderDate >= ? AND OrderDate <= ?) as mtd_gross,
+                    (SELECT SUM(TotalSchemeAmount) FROM orderdetail WHERE CustCode = sub.CustCode AND OrderDate >= ? AND OrderDate <= ?) as mtd_scheme,
+                    (SELECT SUM(TotalNetAmount) FROM orderdetail WHERE CustCode = sub.CustCode AND OrderDate >= ? AND OrderDate <= ?) as mtd_net
                 FROM (
                     SELECT 
                         o.CustCode,
@@ -538,11 +738,14 @@ class NhanVienKPIModel {
                         MAX(d.PhanLoaiNhomKH) as customer_group,
                         MAX(CASE WHEN g.MaKHDMS IS NOT NULL THEN 1 ELSE 0 END) as is_gkhl,
                         MAX(CONCAT_WS(', ', g.DangKyChuongTrinh, g.DangKyMucDoanhSo, g.DangKyTrungBay)) as gkhl_types,
+                        MAX(g.DangKyMucDoanhSo) as gk_limit,
                         o.OrderNumber,
                         o.OrderDate,
-                        SUM(o.TotalNetAmount) as OrderAmount,
-                        SUM(o.Qty) as OrderQty,
-                        CONCAT(o.OrderDate, '|', o.OrderNumber, '|', SUM(o.TotalNetAmount), '|', SUM(o.Qty)) as order_str
+                        SUM(COALESCE(o.TotalGrossAmount, 0)) as OrderGross,
+                        SUM(COALESCE(o.TotalSchemeAmount, 0)) as OrderScheme,
+                        SUM(COALESCE(o.TotalNetAmount, 0)) as OrderAmount,
+                        SUM(COALESCE(o.Qty, 0)) as OrderQty,
+                        CONCAT(COALESCE(o.OrderDate, ''), '|', COALESCE(o.OrderNumber, ''), '|', COALESCE(SUM(o.TotalNetAmount), 0), '|', COALESCE(SUM(o.Qty), 0), '|', COALESCE(SUM(o.TotalGrossAmount), 0), '|', COALESCE(SUM(o.TotalSchemeAmount), 0)) as order_str
                     FROM orderdetail o
                     LEFT JOIN dskh d ON o.CustCode = d.MaKH
                     LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
@@ -552,10 +755,15 @@ class NhanVienKPIModel {
                     " . (!empty($product_filter) ? "AND o.ProductCode LIKE ?" : "") . "
                     GROUP BY o.CustCode, o.OrderNumber, o.OrderDate
                 ) sub
-                GROUP BY CustCode, customer_name, customer_address, customer_province, tax_code, customer_type, customer_group, is_gkhl, gkhl_types
+                GROUP BY CustCode, customer_name, customer_address, customer_province, tax_code, customer_type, customer_group, is_gkhl, gkhl_types, gk_limit
                 ORDER BY total_amount DESC";
         
-        $params = [$dsr_code, $tu_ngay, $den_ngay];
+        $params = [
+            $first_of_month, $den_ngay,
+            $first_of_month, $den_ngay,
+            $first_of_month, $den_ngay,
+            $dsr_code, $tu_ngay, $den_ngay
+        ];
         if (!empty($product_filter)) {
             $params[] = $product_filter . '%';
         }
@@ -564,6 +772,8 @@ class NhanVienKPIModel {
         $stmt->execute($params);
         
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // --- TÍNH NGÀY ĐẠT CHỈ TIÊU GKHL CHI TIẾT ---
         
         foreach ($results as &$row) {
             $row['orders'] = [];
@@ -576,7 +786,9 @@ class NhanVienKPIModel {
                             'date' => $parts[0],
                             'order_number' => $parts[1],
                             'amount' => floatval($parts[2]),
-                            'qty' => intval($parts[3])
+                            'qty' => intval($parts[3]),
+                            'gross' => floatval($parts[4] ?? 0),
+                            'scheme' => floatval($parts[5] ?? 0)
                         ];
                     }
                 }
@@ -605,6 +817,9 @@ class NhanVienKPIModel {
                     COUNT(DISTINCT o.DSRCode) as emp_count,
                     COUNT(DISTINCT o.OrderNumber) as total_orders,
                     COUNT(DISTINCT o.CustCode) as total_customers,
+                    COALESCE(SUM(o.TotalGrossAmount), 0) as total_gross,
+                    COALESCE(SUM(o.TotalSchemeAmount), 0) as total_scheme,
+                    COALESCE(SUM(o.TotalNetAmount), 0) as total_net,
                     COALESCE(SUM(o.TotalNetAmount), 0) as total_amount
                 FROM orderdetail o
                 WHERE o.DSRCode IS NOT NULL 
@@ -719,6 +934,8 @@ class NhanVienKPIModel {
                     ProductCode,
                     ProductSaleType as SaleType,
                     Qty as Quantity,
+                    TotalGrossAmount,
+                    TotalSchemeAmount,
                     TotalNetAmount
                 FROM orderdetail
                 WHERE OrderNumber = ?
