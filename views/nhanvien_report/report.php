@@ -269,20 +269,50 @@ $isViewer = isViewer();
                         </select>
                     </div>
 
-                    <div class="col-md-1">
-                        <button type="submit" class="btn btn-primary w-100" title="Rà Soát">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                    <div class="col-md-1">
-                        <a href="nhanvien_report.php" class="btn btn-secondary w-100" title="Reset">
-                            <i class="fas fa-sync"></i>
+                    <!-- Filter Tỉnh & KV -->
+                <div class="col-md-3">
+                    <label class="form-label small text-muted text-uppercase fw-bold">Khu vực</label>
+                    <select name="khu_vuc" id="filterKhuVuc" class="form-select border-0 shadow-sm">
+                        <option value="">-- Tất cả --</option>
+                        <?php foreach ($available_khuvuc as $kv): ?>
+                            <option value="<?= htmlspecialchars($kv) ?>" <?= ($khu_vuc ?? '') === $kv ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($kv) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted text-uppercase fw-bold">Tỉnh</label>
+                    <select name="tinh" id="filterTinh" class="form-select border-0 shadow-sm">
+                        <option value="">-- Tất cả --</option>
+                        <?php foreach ($available_tinh as $t): ?>
+                            <option value="<?= htmlspecialchars($t) ?>" <?= ($tinh ?? '') === $t ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($t) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <!-- Filter Nhân Viên (Mới) -->
+                <div class="col-md-3">
+                    <label class="form-label small text-muted text-uppercase fw-bold">Nhân viên</label>
+                    <select name="nhan_vien" id="filterNhanVien" class="form-select border-0 shadow-sm" data-live-search="true">
+                        <option value="">-- Tất cả nhân viên --</option>
+                        <!-- JavaScript sẽ load option vào đây -->
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100 shadow-sm fw-bold">
+                        <i class="fas fa-filter me-2"></i>Xem Báo Cáo
+                    </button>
+                    <?php if ($has_filtered): ?>
+                        <a href="nhanvien_report.php" class="btn btn-outline-secondary ms-2" title="Reset Filters">
+                            <i class="fas fa-undo"></i>
                         </a>
-                    </div>
+                    <?php endif; ?>
                 </div>
             </form>
-
-            <!-- ✅ EMPTY STATE - Khi chưa filter -->
+        </div>
+    </div><!-- ✅ EMPTY STATE - Khi chưa filter -->
             <?php if (!$has_filtered): ?>
                 <div class="empty-state">
                     <i class="fas fa-filter"></i>
@@ -1634,6 +1664,80 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+});
+// ✅ CASCADING DROPDOWNS: Khu vực → Tỉnh → Nhân viên
+document.addEventListener('DOMContentLoaded', function() {
+    const filterKhuVuc = document.getElementById('filterKhuVuc');
+    const filterTinh = document.getElementById('filterTinh');
+    const filterNhanVien = document.getElementById('filterNhanVien');
+    
+    // Lưu giá trị selected ban đầu từ PHP select
+    const selectedNhanVien = '<?= htmlspecialchars($nhan_vien ?? '') ?>';
+    
+    // Hàm cập nhật dropdown Tỉnh theo Khu vực
+    function updateTinhDropdown() {
+        const khuVuc = filterKhuVuc?.value || '';
+        
+        fetch(`nhanvien_report.php?action=getTinhByKhuVuc&khu_vuc=${encodeURIComponent(khuVuc)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && filterTinh) {
+                    const currentVal = filterTinh.value;
+                    filterTinh.innerHTML = '<option value="">-- Tất cả --</option>';
+                    data.data.forEach(tinh => {
+                        const opt = document.createElement('option');
+                        opt.value = tinh;
+                        opt.textContent = tinh;
+                        if (tinh === currentVal) opt.selected = true;
+                        filterTinh.appendChild(opt);
+                    });
+                }
+            })
+            .catch(console.error);
+    }
+    
+    // Hàm cập nhật dropdown Nhân viên theo các filter
+    function updateNhanVienDropdown() {
+        const khuVuc = filterKhuVuc?.value || '';
+        const tinh = filterTinh?.value || '';
+        
+        const params = new URLSearchParams({
+            action: 'getNhanVienByFilters',
+            khu_vuc: khuVuc,
+            tinh: tinh
+        });
+        
+        fetch(`nhanvien_report.php?${params}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && filterNhanVien) {
+                    filterNhanVien.innerHTML = '<option value="">-- Tất cả nhân viên --</option>';
+                    data.data.forEach(nv => {
+                        const opt = document.createElement('option');
+                        opt.value = nv.ma_nv;
+                        opt.textContent = `${nv.ho_ten} (${nv.ma_nv})`;
+                        if (nv.ma_nv === selectedNhanVien) opt.selected = true;
+                        filterNhanVien.appendChild(opt);
+                    });
+                }
+            })
+            .catch(console.error);
+    }
+    
+    // Event listeners
+    if (filterKhuVuc) {
+        filterKhuVuc.addEventListener('change', () => {
+            updateTinhDropdown();
+            updateNhanVienDropdown();
+        });
+    }
+    
+    if (filterTinh) {
+        filterTinh.addEventListener('change', updateNhanVienDropdown);
+    }
+    
+    // Load danh sách nhân viên ban đầu
+    updateNhanVienDropdown();
 });
 </script>
 </body>

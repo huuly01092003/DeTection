@@ -122,7 +122,7 @@ function renderAuthNavbar($currentPage = '', $additionalInfo = []) {
                         </li>
                         <li>
                             <a class="dropdown-item" href="dsnv.php?action=list">
-                                <i class="fas fa-list me-2"></i>Xem dsnv
+                                <i class="fas fa-list me-2"></i>Xem DSNV
                             </a>
                         </li>
                     </ul>
@@ -391,6 +391,74 @@ function renderAuthNavbar($currentPage = '', $additionalInfo = []) {
     <?php if ($isViewer): ?>
     display: none !important;
     <?php endif; ?>
+}
+
+/* ✅ MOBILE & TABLET OPTIMIZATION */
+@media (max-width: 991.98px) {
+    .navbar-custom {
+        padding: 0.5rem 1rem;
+    }
+
+    .navbar-brand strong {
+        font-size: 1rem !important;
+    }
+    
+    .navbar-brand div[style*="font-size: 0.7rem"] {
+        display: none; /* Hide subtitle on mobile for space */
+    }
+
+    .navbar-collapse {
+        background: rgba(102, 126, 234, 0.95);
+        backdrop-filter: blur(10px);
+        margin-top: 10px;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+
+    .navbar-nav .nav-link {
+        padding: 10px 15px;
+        margin: 5px 0;
+        border-radius: 8px;
+    }
+
+    .navbar-nav .nav-link:hover, 
+    .navbar-nav .nav-link.active {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Convert floating dropdowns to static blocks for mobile */
+    .dropdown-menu {
+        background: rgba(0, 0, 0, 0.1) !important;
+        border: none;
+        box-shadow: none;
+        padding-left: 20px;
+        margin-top: 5px;
+        margin-bottom: 10px;
+    }
+
+    .dropdown-item {
+        color: rgba(255,255,255,0.9) !important;
+        padding: 8px 15px;
+    }
+
+    .dropdown-item:hover {
+        background: rgba(255,255,255,0.1);
+        color: white !important;
+        transform: translateX(5px);
+    }
+
+    /* User Info Mobile Override */
+    .user-info {
+        display: block !important; /* Force show in list view */
+        margin-top: 5px;
+    }
+    
+    .navbar-nav .nav-link.d-flex.align-items-center {
+        background: rgba(0,0,0,0.1) !important;
+        margin-top: 15px;
+        margin-bottom: 15px;
+    }
 }
 </style>
 

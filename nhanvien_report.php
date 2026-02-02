@@ -17,6 +17,16 @@ $controller = new NhanVienReportController();
 $action = $_GET['action'] ?? 'report';
 
 switch ($action) {
+    case 'getTinhByKhuVuc':
+        // Lấy danh sách Tỉnh theo Khu vực (cascading)
+        $controller->getTinhByKhuVuc();
+        break;
+
+    case 'getNhanVienByFilters':
+        // Lấy danh sách Nhân viên theo filters (cascading)
+        $controller->getNhanVienByFilters();
+        break;
+
     case 'get_orders':
         // Lấy chi tiết đơn hàng nhân viên (AJAX)
         $controller->getEmployeeOrders();

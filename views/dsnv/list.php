@@ -284,7 +284,7 @@ if ($action === 'list') {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="mb-0">
-                            <i class="fas fa-users me-2"></i>Quản lý Danh Sách Nhân Viên
+                            <i class="fas fa-users me-2"></i>Quản lý danh sách nhân viên
                         </h5>
                         <small class="text-muted">
                             <i class="fas fa-database me-1"></i>
@@ -292,11 +292,6 @@ if ($action === 'list') {
                             | <i class="fas fa-check-circle ms-2 me-1"></i>
                             Đang làm: <strong><?= number_format($activeCount) ?></strong>
                         </small>
-                    </div>
-                    <div>
-                        <a href="dsnv.php" class="btn btn-primary btn-action">
-                            <i class="fas fa-file-import me-2"></i>Import CSV
-                        </a>
                     </div>
                 </div>
             </div>

@@ -43,9 +43,9 @@ class NhanVienReportModel {
     /**
      * ✅ LẤY TẤT CẢ NHÂN VIÊN - WITH REDIS CACHE + DB BACKUP
      */
-    public function getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang) {
-        // 1️⃣ Tạo cache key (v2 to force refresh)
-        $cacheKey = $this->generateCacheKey('employees_v2', $thang, $tu_ngay, $den_ngay);
+    public function getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang, $khu_vuc = '', $tinh = '', $nhan_vien = '') {
+        // 1️⃣ Tạo cache key (v3 to force refresh with filters)
+        $cacheKey = $this->generateCacheKey('employees_v3', $thang, $tu_ngay, $den_ngay, $khu_vuc, $tinh, $nhan_vien);
         
         // 2️⃣ Thử lấy từ Redis
         if ($this->redis) {
@@ -105,14 +105,11 @@ class NhanVienReportModel {
                         THEN DATE(o.OrderDate) END) as so_ngay_co_doanh_so_thang,
                     COALESCE(MAX(ds_thang.max_daily), 0) as ds_ngay_cao_nhat_nv_thang,
 
-                    -- MỚI: Doanh số khách hàng lớn nhất trong khoảng
                     COALESCE(MAX(ds_kh_khoang.max_cust_amount), 0) as ds_kh_lon_nhat_khoang,
                     
-                    -- MỚI: Doanh số từ khách hàng GKHL (Gắn kết Hoa Linh)
                     SUM(CASE WHEN o.OrderDate >= :tu_ngay AND o.OrderDate <= :den_ngay_end AND g.MaKHDMS IS NOT NULL 
                         THEN o.TotalNetAmount ELSE 0 END) as ds_gkhl_khoang,
                         
-                    -- MỚI: Số khách hàng GKHL phát sinh đơn trong khoảng
                     COUNT(DISTINCT CASE WHEN o.OrderDate >= :tu_ngay AND o.OrderDate <= :den_ngay_end AND g.MaKHDMS IS NOT NULL 
                         THEN o.CustCode END) as so_kh_gkhl_khoang
                     
@@ -157,7 +154,6 @@ class NhanVienReportModel {
                     GROUP BY DSRCode
                 ) ds_thang ON o.DSRCode = ds_thang.DSRCode
     
-                -- Subquery lấy doanh số khách hàng lớn nhất
                 LEFT JOIN (
                     SELECT 
                         DSRCode,
@@ -179,18 +175,35 @@ class NhanVienReportModel {
                 AND (
                     (o.OrderDate >= :tu_ngay AND o.OrderDate <= :den_ngay_end)
                     OR (o.RptYear = :year AND o.RptMonth = :month)
-                )
-                GROUP BY o.DSRCode, o.DSRTypeProvince
-                HAVING ds_tien_do > 0 OR ds_tong_thang_nv > 0
-                ORDER BY o.DSRCode";
-        
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([
+                )";
+
+        // ✅ APPLY FILTERS
+        $params = [
             'tu_ngay' => $tu_ngay,
             'den_ngay_end' => $den_ngay_end,
             'year' => $year,
             'month' => $month
-        ]);
+        ];
+
+        if (!empty($khu_vuc)) {
+            $sql .= " AND nv_info.khu_vuc = :khu_vuc";
+            $params['khu_vuc'] = $khu_vuc;
+        }
+        if (!empty($tinh)) {
+            $sql .= " AND nv_info.base_tinh = :tinh";
+            $params['tinh'] = $tinh;
+        }
+        if (!empty($nhan_vien)) {
+            $sql .= " AND o.DSRCode = :nhan_vien";
+            $params['nhan_vien'] = $nhan_vien;
+        }
+
+        $sql .= " GROUP BY o.DSRCode, o.DSRTypeProvince
+                  HAVING ds_tien_do > 0 OR ds_tong_thang_nv > 0
+                  ORDER BY o.DSRCode";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
         
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -531,8 +544,12 @@ class NhanVienReportModel {
     /**
      * ✅ GENERATE CACHE KEY
      */
-    private function generateCacheKey($type, $thang, $tu_ngay, $den_ngay) {
-        return "nhanvien:{$type}:{$thang}:{$tu_ngay}:{$den_ngay}";
+    /**
+     * ✅ GENERATE CACHE KEY
+     */
+    private function generateCacheKey($type, $thang, $tu_ngay, $den_ngay, $khu_vuc = '', $tinh = '', $nhan_vien = '') {
+        $filterHash = md5($khu_vuc . $tinh . $nhan_vien);
+        return "nhanvien:{$type}:{$thang}:{$tu_ngay}:{$den_ngay}:{$filterHash}";
     }
 
     /**
@@ -637,6 +654,61 @@ class NhanVienReportModel {
             ];
         }
         return $results;
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH KHU VỰC
+     */
+    public function getAvailableKhuVuc() {
+        $sql = "SELECT DISTINCT khu_vuc FROM dsnv WHERE khu_vuc IS NOT NULL AND khu_vuc != '' ORDER BY khu_vuc";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH TỈNH
+     */
+    public function getAvailableTinh() {
+        $sql = "SELECT DISTINCT base_tinh FROM dsnv WHERE base_tinh IS NOT NULL AND base_tinh != '' ORDER BY base_tinh";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY TỈNH THEO KHU VỰC
+     */
+    public function getTinhByKhuVuc($khu_vuc) {
+        if (empty($khu_vuc)) return $this->getAvailableTinh();
+        
+        $sql = "SELECT DISTINCT base_tinh FROM dsnv WHERE khu_vuc = ? AND base_tinh IS NOT NULL ORDER BY base_tinh";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([$khu_vuc]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY NHÂN VIÊN THEO FILTERS
+     */
+    public function getNhanVienByFilters($khu_vuc = '', $tinh = '') {
+        $sql = "SELECT ma_nv, ho_ten FROM dsnv WHERE 1=1";
+        $params = [];
+        
+        if (!empty($khu_vuc)) {
+            $sql .= " AND khu_vuc = ?";
+            $params[] = $khu_vuc;
+        }
+        if (!empty($tinh)) {
+            $sql .= " AND base_tinh = ?";
+            $params[] = $tinh;
+        }
+        
+        $sql .= " AND ho_ten IS NOT NULL AND ho_ten != '' ORDER BY ho_ten";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getTotalByMonth($thang) {

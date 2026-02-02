@@ -107,6 +107,39 @@ class NhanVienReportController {
     }
 
     /**
+     * ✅ AJAX: Lấy danh sách Tỉnh theo Khu vực (cascading dropdown)
+     */
+    public function getTinhByKhuVuc() {
+        header('Content-Type: application/json');
+        
+        $khu_vuc = $_GET['khu_vuc'] ?? '';
+        
+        try {
+            $tinh_list = $this->model->getTinhByKhuVuc($khu_vuc);
+            echo json_encode(['success' => true, 'data' => $tinh_list]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ✅ AJAX: Lấy danh sách Nhân viên theo các filter (cascading dropdown)
+     */
+    public function getNhanVienByFilters() {
+        header('Content-Type: application/json');
+        
+        $khu_vuc = $_GET['khu_vuc'] ?? '';
+        $tinh = $_GET['tinh'] ?? '';
+        
+        try {
+            $nhanvien_list = $this->model->getNhanVienByFilters($khu_vuc, $tinh);
+            echo json_encode(['success' => true, 'data' => $nhanvien_list]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * ✅ HIỂN THỊ BÁO CÁO CHÍNH
      * Permission: Tất cả role có thể xem
      */
@@ -148,6 +181,10 @@ class NhanVienReportController {
                 require_once 'views/nhanvien_report/report.php';
                 return;
             }
+
+            // ✅ LẤY DỮ LIỆU CHO FILTER
+            $available_khuvuc = $this->model->getAvailableKhuVuc();
+            $available_tinh = $this->model->getAvailableTinh();
             
             $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
             
@@ -217,6 +254,11 @@ class NhanVienReportController {
             $he_so = max(1, min(5, $he_so)); // Giới hạn từ 1 đến 5
             
             $ty_le_nghi_van = $ket_qua_chung * $he_so;
+
+            // ✅ LẤY FILTER NÂNG CAO
+            $khu_vuc = !empty($_GET['khu_vuc']) ? trim($_GET['khu_vuc']) : '';
+            $tinh = !empty($_GET['tinh']) ? trim($_GET['tinh']) : '';
+            $nhan_vien = !empty($_GET['nhan_vien']) ? trim($_GET['nhan_vien']) : '';
 
             // ✅ XỬ LÝ LỊCH SỬ (SO SÁNH CÁC THÁNG TRƯỚC)
             $so_thang_lich_su = isset($_GET['so_thang_lich_su']) ? intval($_GET['so_thang_lich_su']) : 0;
@@ -384,8 +426,8 @@ class NhanVienReportController {
                 'so_ngay_trong_thang' => $stats_thang['so_ngay'] ?? 30
             ];
 
-            // ✅ LẤY NHÂN VIÊN (sẽ dùng cache nếu có)
-            $employees = $this->model->getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang);
+            // ✅ LẤY NHÂN VIÊN (sẽ dùng cache nếu có) - CÓ FILTER
+            $employees = $this->model->getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang, $khu_vuc, $tinh, $nhan_vien);
 
             if (empty($employees)) {
                 $message = "⚠️ Không có dữ liệu nhân viên trong khoảng thời gian này.";
