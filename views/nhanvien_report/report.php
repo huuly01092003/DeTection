@@ -217,48 +217,49 @@ $isViewer = isViewer();
             <?php endif; ?>
 
             <!-- ✅ Form Filter -->
+            <!-- ✅ Form Filter -->
             <form id="filterForm" method="get" class="filter-section">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-2">
+                <div class="row g-2 align-items-end"> <!-- Reduced gap g-2 -->
+                    <div class="col-6 col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar-alt"></i> Tháng</label>
-                        <select name="thang" id="selectThang" class="form-select" required>
+                        <select name="thang" id="selectThang" class="form-select text-truncate" required>
                             <?php foreach ($available_months as $m): ?>
                                 <option value="<?= htmlspecialchars($m) ?>" <?= ($m === $thang) ? 'selected' : '' ?>>
-                                    Tháng <?= date('m/Y', strtotime($m . '-01')) ?>
+                                    T<?= date('m/y', strtotime($m . '-01')) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     
                     <?php
-                        // Xác định min/max cho input date dựa trên tháng đã chọn
+                        // Xác định min/max cho input date
                         $current_range = $date_ranges[$thang] ?? null;
                         $min_date = $current_range ? $current_range['min_date'] : ($thang . '-01');
                         $max_date = $current_range ? $current_range['max_date'] : date('Y-m-t', strtotime($thang . '-01'));
                     ?>
-                    <div class="col-md-2">
+                    <div class="col-6 col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar"></i> Từ Ngày</label>
                         <input type="date" name="tu_ngay" id="tuNgay" class="form-control" 
                                value="<?= htmlspecialchars($tu_ngay) ?>" 
                                min="<?= $min_date ?>" max="<?= $max_date ?>" required>
                     </div>
                     
-                    <div class="col-md-2">
+                    <div class="col-6 col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar"></i> Đến Ngày</label>
                         <input type="date" name="den_ngay" id="denNgay" class="form-control" 
                                value="<?= htmlspecialchars($den_ngay) ?>" 
                                min="<?= $min_date ?>" max="<?= $max_date ?>" required>
                     </div>
                     
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold"><i class="fas fa-percentage"></i> Hệ Số NV</label>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label fw-bold"><i class="fas fa-percentage"></i> Hệ Số</label>
                         <input type="number" name="he_so" id="heSo" class="form-control" 
                                value="<?= htmlspecialchars($he_so ?? 1.5) ?>" 
                                step="0.1" min="1" max="5" placeholder="1.5">
                     </div>
                     
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold"><i class="fas fa-history"></i> Tháng Trước</label>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label fw-bold text-truncate"><i class="fas fa-history"></i> T.Trước</label>
                         <select name="so_thang_lich_su" class="form-select">
                             <option value="0" <?= (($so_thang_lich_su ?? 0) == 0) ? 'selected' : '' ?>>Không</option>
                             <?php for ($i = 1; $i <= ($max_history_months ?? 0); $i++): ?>
@@ -270,45 +271,48 @@ $isViewer = isViewer();
                     </div>
 
                     <!-- Filter Tỉnh & KV -->
-                <div class="col-md-3">
-                    <label class="form-label small text-muted text-uppercase fw-bold">Khu vực</label>
-                    <select name="khu_vuc" id="filterKhuVuc" class="form-select border-0 shadow-sm">
-                        <option value="">-- Tất cả --</option>
-                        <?php foreach ($available_khuvuc as $kv): ?>
-                            <option value="<?= htmlspecialchars($kv) ?>" <?= ($khu_vuc ?? '') === $kv ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($kv) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label small text-muted text-uppercase fw-bold">Tỉnh</label>
-                    <select name="tinh" id="filterTinh" class="form-select border-0 shadow-sm">
-                        <option value="">-- Tất cả --</option>
-                        <?php foreach ($available_tinh as $t): ?>
-                            <option value="<?= htmlspecialchars($t) ?>" <?= ($tinh ?? '') === $t ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($t) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <!-- Filter Nhân Viên (Mới) -->
-                <div class="col-md-3">
-                    <label class="form-label small text-muted text-uppercase fw-bold">Nhân viên</label>
-                    <select name="nhan_vien" id="filterNhanVien" class="form-select border-0 shadow-sm" data-live-search="true">
-                        <option value="">-- Tất cả nhân viên --</option>
-                        <!-- JavaScript sẽ load option vào đây -->
-                    </select>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100 shadow-sm fw-bold">
-                        <i class="fas fa-filter me-2"></i>Xem Báo Cáo
-                    </button>
-                    <?php if ($has_filtered): ?>
-                        <a href="nhanvien_report.php" class="btn btn-outline-secondary ms-2" title="Reset Filters">
-                            <i class="fas fa-undo"></i>
-                        </a>
-                    <?php endif; ?>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label fw-bold">Khu vực</label>
+                        <select name="khu_vuc" id="filterKhuVuc" class="form-select border-0 shadow-sm text-truncate">
+                            <option value="">-- Tất cả --</option>
+                            <?php foreach ($available_khuvuc as $kv): ?>
+                                <option value="<?= htmlspecialchars($kv) ?>" <?= ($khu_vuc ?? '') === $kv ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($kv) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-6 col-md-2">
+                        <label class="form-label fw-bold">Tỉnh</label>
+                        <select name="tinh" id="filterTinh" class="form-select border-0 shadow-sm text-truncate">
+                            <option value="">-- TC --</option>
+                            <?php foreach ($available_tinh as $t): ?>
+                                <option value="<?= htmlspecialchars($t) ?>" <?= ($tinh ?? '') === $t ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($t) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <!-- Filter Nhân Viên - Full width on mobile -->
+                    <div class="col-12 col-md-4">
+                        <label class="form-label fw-bold">Nhân viên</label>
+                        <select name="nhan_vien" id="filterNhanVien" class="form-select border-0 shadow-sm" data-live-search="true">
+                            <option value="">-- Tất cả nhân viên --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12 col-md-2 d-flex align-items-end mt-2">
+                        <button type="submit" class="btn btn-primary w-100 shadow-sm fw-bold">
+                            <i class="fas fa-filter"></i> Xem
+                        </button>
+                        <?php if ($has_filtered): ?>
+                            <a href="nhanvien_report.php" class="btn btn-outline-secondary ms-2" title="Reset Filters">
+                                <i class="fas fa-undo"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </form>
         </div>
@@ -576,8 +580,12 @@ $isViewer = isViewer();
                             </div>
                             <div class="mobile-card-body">
                                 <div class="mobile-stat-row">
+                                    <span class="mobile-stat-label">Khu vực / Tỉnh:</span>
+                                    <span class="mobile-stat-value text-dark fw-bold"><?= htmlspecialchars($r['khu_vuc'] ?? '') ?> - <?= htmlspecialchars($r['base_tinh'] ?? '') ?></span>
+                                </div>
+                                <div class="mobile-stat-row">
                                     <span class="mobile-stat-label">Doanh Số (Khoảng):</span>
-                                    <span class="mobile-stat-value text-primary"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</span>
+                                    <span class="mobile-stat-value text-primary fw-bold"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</span>
                                 </div>
                                 <div class="mobile-stat-row">
                                     <span class="mobile-stat-label">DS Tiến Độ:</span>
@@ -586,11 +594,11 @@ $isViewer = isViewer();
                                 <div class="d-flex justify-content-between mt-3 align-items-center">
                                     <div>
                                         <?php if ($r['rank'] > 0): ?>
-                                            <span class="badge bg-secondary">Rank #<?= $r['rank'] ?></span>
+                                            <span class="badge bg-secondary">#<?= $r['rank'] ?></span>
                                         <?php endif; ?>
                                         <span class="badge bg-light text-dark border"><?= htmlspecialchars($r['bo_phan']) ?></span>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-primary" 
+                                    <button class="btn btn-sm btn-outline-primary shadow-sm" 
                                             type="button"
                                             data-bs-toggle="modal" 
                                             data-bs-target="#detailModal"
