@@ -31,6 +31,10 @@ class NhanVienKPIController {
         $filters = [];
         $available_months = [];
         $available_products = [];
+        $available_khuvuc = [];
+        $available_tinh = [];
+        $available_bophan = [];
+        $available_chucvu = [];
         $has_filtered = false;
         
         $threshold_n = isset($_GET['threshold_n']) ? intval($_GET['threshold_n']) : 5;
@@ -47,6 +51,10 @@ class NhanVienKPIController {
             }
             
             $available_products = $this->model->getAvailableProducts();
+            $available_khuvuc = $this->model->getAvailableKhuVuc();
+            $available_tinh = $this->model->getAvailableTinh();
+            $available_bophan = $this->model->getAvailableBoPhan();
+            $available_chucvu = $this->model->getAvailableChucVu();
             
             $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
             
@@ -100,16 +108,28 @@ class NhanVienKPIController {
             if ($product_filter === '--all--') $product_filter = '';
             if (!empty($product_filter)) $product_filter = substr($product_filter, 0, 2);
             
+            // ✅ LẤY FILTER NÂNG CAO
+            $khu_vuc = !empty($_GET['khu_vuc']) ? trim($_GET['khu_vuc']) : '';
+            $tinh = !empty($_GET['tinh']) ? trim($_GET['tinh']) : '';
+            $bo_phan = !empty($_GET['bo_phan']) ? trim($_GET['bo_phan']) : '';
+            $chuc_vu = !empty($_GET['chuc_vu']) ? trim($_GET['chuc_vu']) : '';
+            $nhan_vien = !empty($_GET['nhan_vien']) ? trim($_GET['nhan_vien']) : '';
+            
             $filters = [
                 'thang' => $thang,
                 'tu_ngay' => $tu_ngay,
                 'den_ngay' => $den_ngay,
                 'product_filter' => $product_filter,
-                'threshold_n' => $threshold_n
+                'threshold_n' => $threshold_n,
+                'khu_vuc' => $khu_vuc,
+                'tinh' => $tinh,
+                'bo_phan' => $bo_phan,
+                'chuc_vu' => $chuc_vu,
+                'nhan_vien' => $nhan_vien
             ];
             
             // ✅ LẤY DỮ LIỆU
-            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter, $threshold_n);
+            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter, $threshold_n, $khu_vuc, $tinh, $bo_phan, $chuc_vu, $nhan_vien);
             
             if (empty($employees)) {
                 $message = "⚠️ Không có dữ liệu nhân viên.";
@@ -290,6 +310,41 @@ class NhanVienKPIController {
         try {
             $products = $this->model->getOrderProductDetails($order_number, $product_filter);
             echo json_encode(['success' => true, 'data' => $products]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ✅ AJAX: Lấy danh sách Tỉnh theo Khu vực (cascading dropdown)
+     */
+    public function getTinhByKhuVuc() {
+        header('Content-Type: application/json');
+        
+        $khu_vuc = $_GET['khu_vuc'] ?? '';
+        
+        try {
+            $tinh_list = $this->model->getTinhByKhuVuc($khu_vuc);
+            echo json_encode(['success' => true, 'data' => $tinh_list]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ✅ AJAX: Lấy danh sách Nhân viên theo các filter (cascading dropdown)
+     */
+    public function getNhanVienByFilters() {
+        header('Content-Type: application/json');
+        
+        $khu_vuc = $_GET['khu_vuc'] ?? '';
+        $tinh = $_GET['tinh'] ?? '';
+        $bo_phan = $_GET['bo_phan'] ?? '';
+        $chuc_vu = $_GET['chuc_vu'] ?? '';
+        
+        try {
+            $nhanvien_list = $this->model->getNhanVienByFilters($khu_vuc, $tinh, $bo_phan, $chuc_vu);
+            echo json_encode(['success' => true, 'data' => $nhanvien_list]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

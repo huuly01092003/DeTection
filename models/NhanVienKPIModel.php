@@ -39,8 +39,8 @@ class NhanVienKPIModel {
     /**
      * ✅ LẤY NHÂN VIÊN - QUERY ĐƠN GIẢN HƠN
      */
-    public function getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter = '', $threshold_n = 5) {
-        $cacheKey = $this->generateCacheKey($tu_ngay, $den_ngay, $product_filter, $threshold_n);
+    public function getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter = '', $threshold_n = 5, $khu_vuc = '', $tinh = '', $bo_phan = '', $chuc_vu = '', $nhan_vien = '') {
+        $cacheKey = $this->generateCacheKey($tu_ngay, $den_ngay, $product_filter, $threshold_n, $khu_vuc, $tinh, $bo_phan, $chuc_vu, $nhan_vien);
         
         // Thử Redis
         if ($this->redis) {
@@ -115,6 +115,38 @@ class NhanVienKPIModel {
             }
         }
         
+        // ✅ LỌC NHÂN VIÊN THEO CÁC BỘ LỌC NÂNG CAO
+        if (!empty($khu_vuc) || !empty($tinh) || !empty($bo_phan) || !empty($chuc_vu)) {
+            $filtered_emp_base = [];
+            foreach ($emp_base as $emp) {
+                $dsrCode = $emp['DSRCode'];
+                $nv = $nv_data[$dsrCode] ?? null;
+                
+                // Bỏ qua nếu không có thông tin NV
+                if (!$nv) continue;
+                
+                // Check từng filter
+                if (!empty($khu_vuc) && ($nv['khu_vuc'] ?? '') !== $khu_vuc) continue;
+                if (!empty($tinh) && ($nv['base_tinh'] ?? '') !== $tinh) continue;
+                if (!empty($bo_phan) && ($nv['bo_phan'] ?? '') !== $bo_phan) continue;
+                if (!empty($chuc_vu) && ($nv['chuc_vu'] ?? '') !== $chuc_vu) continue;
+                
+                $filtered_emp_base[] = $emp;
+            }
+            $emp_base = $filtered_emp_base;
+            
+            if (empty($emp_base)) return [];
+        }
+        
+        // ✅ LỌC THEO NHÂN VIÊN CỤ THỂ
+        if (!empty($nhan_vien)) {
+            $emp_base = array_filter($emp_base, function($emp) use ($nhan_vien) {
+                return $emp['DSRCode'] === $nhan_vien;
+            });
+            $emp_base = array_values($emp_base);
+            if (empty($emp_base)) return [];
+        }
+        
         // ✅ Lấy thống kê cho từng nhân viên (loop đơn giản)
         $results = [];
         
@@ -183,24 +215,24 @@ class NhanVienKPIModel {
         $first_of_month = date('Y-m-01', strtotime($tu_ngay));
         $day_before_start = date('Y-m-d', strtotime($tu_ngay . ' -1 day'));
         
-        $customerRunningNet = []; // Lũy kế doanh số cho mỗi khách hàng
+        $customerRunningNet = []; // Lũy kế doanh số cho mỗi khách hàng THEO TẪNg DSRCode
 
         // Bước 1: Lấy doanh số 'nền' từ đầu tháng đến trước ngày bắt đầu báo cáo
-        // ✅ OPTIMIZED: Chỉ lấy khách hàng CÓ trong danh sách GKHL & sử dụng Rpt params
+        // ✅ SỬa: Phân biệt theo DSRCode để đếm chính xác KH đạt GKHL cho từng NV
         if ($day_before_start >= $first_of_month) {
-            $sqlBaseNet = "SELECT o.CustCode, SUM(o.TotalNetAmount) as base_net 
+            $sqlBaseNet = "SELECT o.DSRCode, o.CustCode, SUM(o.TotalNetAmount) as base_net 
                            FROM orderdetail o
                            JOIN gkhl g ON o.CustCode = g.MaKHDMS
                            WHERE o.OrderDate >= ? AND o.OrderDate <= ? 
                            " . $rpt_where . "
-                           GROUP BY o.CustCode";
+                           GROUP BY o.DSRCode, o.CustCode";
             
             $baseParams = array_merge([$first_of_month, $day_before_start], $rpt_params);
             
             $stmtBase = $this->conn->prepare($sqlBaseNet);
             $stmtBase->execute($baseParams);
             while ($row = $stmtBase->fetch(PDO::FETCH_ASSOC)) {
-                $customerRunningNet[$row['CustCode']] = floatval($row['base_net']);
+                $customerRunningNet[$row['DSRCode']][$row['CustCode']] = floatval($row['base_net']);
             }
         }
 
@@ -223,6 +255,8 @@ class NhanVienKPIModel {
         
         foreach ($gkhlData as $gd) {
             $cust = $gd['CustCode'];
+            $dsrCode = $gd['DSRCode'];
+            $orderDate = $gd['OrderDate'];
             $limitStr = $gd['gk_limit'];
             
             // XỬ LÝ ĐỊNH MỨC: Loại bỏ dấu phẩy
@@ -231,15 +265,13 @@ class NhanVienKPIModel {
             
             if ($limit <= 0) continue;
 
-            $prevNet = $customerRunningNet[$cust] ?? 0;
+            // ✅ SỬa: Lấy prevNet THEO DSRCode
+            $prevNet = $customerRunningNet[$dsrCode][$cust] ?? 0;
             $currNet = $prevNet + floatval($gd['day_net']);
-            $customerRunningNet[$cust] = $currNet;
+            $customerRunningNet[$dsrCode][$cust] = $currNet;
 
-            // ✅ CHỈ ĐẾM KH ĐẠT CHỈ TIÊU (chuyển từ chưa đạt -> đạt)
+            // ✅ CHỈ ĐẼM KH ĐẠT CHỈ TIÊU (chuyển từ chưa đạt -> đạt)
             if ($prevNet < $limit && $currNet >= $limit) {
-                $dsrCode = $gd['DSRCode'];
-                $orderDate = $gd['OrderDate'];
-                
                 if (!isset($gkhlAchieverMap[$dsrCode][$orderDate])) {
                     $gkhlAchieverMap[$dsrCode][$orderDate] = 0;
                 }
@@ -555,7 +587,7 @@ class NhanVienKPIModel {
                 }
             }
 
-            if ($is_threshold_violation || $is_splitting || $is_consolidation || $is_scheme_abusing || $is_alternating || $is_gkhl_achieving) {
+            if ($is_threshold_violation || $is_splitting || $is_consolidation || $is_scheme_abusing || $is_alternating) {
                 $reasons = [];
                 if ($is_threshold_violation) {
                     $ratio = round($count / $adaptive_n, 1);
@@ -574,7 +606,6 @@ class NhanVienKPIModel {
 
                 if ($is_consolidation) $reasons[] = "📦 Nghi vấn gộp đơn (AOV cực cao)";
                 if ($is_scheme_abusing) $reasons[] = "💰 Lạm dụng khuyến mãi (" . round($day_scheme_rate * 100, 1) . "%)";
-                if ($is_gkhl_achieving) $reasons[] = "🎯 KH đạt mức GKHL (25-cuối tháng): " . $daily_gkhl_achievers[$idx] . " KH";
                 if ($is_alternating) $reasons[] = "⚖️ Biến động khách hàng (Ngày trước/sau lệch lớn)";
 
                 if ($is_threshold_violation) $violation_count++;
@@ -626,7 +657,7 @@ class NhanVienKPIModel {
         foreach ($violation_days as $vd) {
             foreach ($vd['reasons'] as $r) {
                 if (strpos($r, "💰") !== false) $scheme_score += 10;
-                if (strpos($r, "🎯") !== false) $scheme_score += 10;
+                // ✅ Đã bỏ GKHL khỏi tính điểm
             }
         }
         $risk_scores['scheme'] = min(20, $scheme_score);
@@ -924,9 +955,10 @@ class NhanVienKPIModel {
         return $result;
     }
 
-    private function generateCacheKey($tu_ngay, $den_ngay, $product_filter, $threshold_n) {
+    private function generateCacheKey($tu_ngay, $den_ngay, $product_filter, $threshold_n, $khu_vuc = '', $tinh = '', $bo_phan = '', $chuc_vu = '', $nhan_vien = '') {
         $productHash = !empty($product_filter) ? md5($product_filter) : 'all';
-        return "nhanvien:kpi:N{$threshold_n}:{$tu_ngay}:{$den_ngay}:{$productHash}";
+        $filterHash = md5($khu_vuc . '|' . $tinh . '|' . $bo_phan . '|' . $chuc_vu . '|' . $nhan_vien);
+        return "nhanvien:kpi:N{$threshold_n}:{$tu_ngay}:{$den_ngay}:{$productHash}:{$filterHash}";
     }
 
     public function clearCache($pattern = 'nhanvien:kpi:*') {
@@ -995,6 +1027,100 @@ class NhanVienKPIModel {
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH KHU VỰC
+     */
+    public function getAvailableKhuVuc() {
+        $sql = "SELECT DISTINCT khu_vuc FROM dsnv WHERE khu_vuc IS NOT NULL AND khu_vuc != '' ORDER BY khu_vuc";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH TỈNH
+     */
+    public function getAvailableTinh() {
+        $sql = "SELECT DISTINCT base_tinh FROM dsnv WHERE base_tinh IS NOT NULL AND base_tinh != '' ORDER BY base_tinh";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH BỘ PHẬN
+     */
+    public function getAvailableBoPhan() {
+        $sql = "SELECT DISTINCT bo_phan FROM dsnv WHERE bo_phan IS NOT NULL AND bo_phan != '' ORDER BY bo_phan";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH CHỨC VỤ
+     */
+    public function getAvailableChucVu() {
+        $sql = "SELECT DISTINCT chuc_vu FROM dsnv WHERE chuc_vu IS NOT NULL AND chuc_vu != '' ORDER BY chuc_vu";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH TỈNH THEO KHU VỰC (cho cascading dropdown)
+     */
+    public function getTinhByKhuVuc($khu_vuc = '') {
+        if (empty($khu_vuc)) {
+            return $this->getAvailableTinh();
+        }
+        $sql = "SELECT DISTINCT base_tinh FROM dsnv WHERE khu_vuc = ? AND base_tinh IS NOT NULL AND base_tinh != '' ORDER BY base_tinh";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([$khu_vuc]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * ✅ LẤY DANH SÁCH NHÂN VIÊN THEO CÁC FILTER (cho cascading dropdown)
+     */
+    public function getNhanVienByFilters($khu_vuc = '', $tinh = '', $bo_phan = '', $chuc_vu = '') {
+        $sql = "SELECT ma_nv, ho_ten FROM dsnv WHERE 1=1";
+        $params = [];
+        
+        if (!empty($khu_vuc)) {
+            $sql .= " AND khu_vuc = ?";
+            $params[] = $khu_vuc;
+        }
+        if (!empty($tinh)) {
+            $sql .= " AND base_tinh = ?";
+            $params[] = $tinh;
+        }
+        if (!empty($bo_phan)) {
+            $sql .= " AND bo_phan = ?";
+            $params[] = $bo_phan;
+        }
+        if (!empty($chuc_vu)) {
+            $sql .= " AND chuc_vu = ?";
+            $params[] = $chuc_vu;
+        }
+        
+        $sql .= " AND ho_ten IS NOT NULL AND ho_ten != '' ORDER BY ho_ten";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * ✅ LẤY TẤT CẢ NHÂN VIÊN
+     */
+    public function getAvailableNhanVien() {
+        $sql = "SELECT ma_nv, ho_ten FROM dsnv WHERE ho_ten IS NOT NULL AND ho_ten != '' ORDER BY ho_ten";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /**

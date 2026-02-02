@@ -278,6 +278,61 @@ $isViewer = isViewer();
                     </div>
                 </div>
                 
+                <!-- ✅ BỘ LỌC NÂNG CAO -->
+                <div class="row g-3 mt-2">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold"><i class="fas fa-map-marker-alt"></i> Khu vực</label>
+                        <select name="khu_vuc" id="filterKhuVuc" class="form-select">
+                            <option value="">-- Tất cả --</option>
+                            <?php if (!empty($available_khuvuc)): foreach ($available_khuvuc as $kv): ?>
+                                <option value="<?= htmlspecialchars($kv) ?>" <?= ($kv === ($filters['khu_vuc'] ?? '')) ? 'selected' : '' ?>><?= htmlspecialchars($kv) ?></option>
+                            <?php endforeach; endif; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold"><i class="fas fa-city"></i> Tỉnh/TP</label>
+                        <select name="tinh" id="filterTinh" class="form-select">
+                            <option value="">-- Tất cả --</option>
+                            <?php if (!empty($available_tinh)): foreach ($available_tinh as $t): ?>
+                                <option value="<?= htmlspecialchars($t) ?>" <?= ($t === ($filters['tinh'] ?? '')) ? 'selected' : '' ?>><?= htmlspecialchars($t) ?></option>
+                            <?php endforeach; endif; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold"><i class="fas fa-building"></i> Bộ phận</label>
+                        <select name="bo_phan" id="filterBoPhan" class="form-select">
+                            <option value="">-- Tất cả --</option>
+                            <?php if (!empty($available_bophan)): foreach ($available_bophan as $bp): ?>
+                                <option value="<?= htmlspecialchars($bp) ?>" <?= ($bp === ($filters['bo_phan'] ?? '')) ? 'selected' : '' ?>><?= htmlspecialchars($bp) ?></option>
+                            <?php endforeach; endif; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold"><i class="fas fa-user-tie"></i> Chức vụ</label>
+                        <select name="chuc_vu" id="filterChucVu" class="form-select">
+                            <option value="">-- Tất cả --</option>
+                            <?php if (!empty($available_chucvu)): foreach ($available_chucvu as $cv): ?>
+                                <option value="<?= htmlspecialchars($cv) ?>" <?= ($cv === ($filters['chuc_vu'] ?? '')) ? 'selected' : '' ?>><?= htmlspecialchars($cv) ?></option>
+                            <?php endforeach; endif; ?>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- ✅ BỘ LỌC NHÂN VIÊN (Row riêng) -->
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="fas fa-user"></i> Nhân viên</label>
+                        <select name="nhan_vien" id="filterNhanVien" class="form-select">
+                            <option value="">-- Tất cả nhân viên --</option>
+                            <!-- Sẽ được cập nhật bởi JavaScript -->
+                        </select>
+                        <small class="text-muted">Chọn Khu vực/Tỉnh để lọc danh sách nhân viên</small>
+                    </div>
+                </div>
+                
                 <div class="threshold-box mt-3">
                     <strong><i class="fas fa-info-circle"></i> Logic:</strong> 
                     Hệ thống sẽ đánh dấu mỗi ngày có <strong>số khách > <?= intval($filters['threshold_n'] ?? 5) ?></strong> là vi phạm.
@@ -560,17 +615,6 @@ function showDetail(data) {
                         <div class="small">
                             ${v.reasons.map(r => `<span class="badge ${r.includes('✂️') ? 'bg-info' : (r.includes('💰') ? 'bg-warning text-dark' : (r.includes('🎯') ? 'bg-success' : 'bg-light text-dark'))} border me-1">${r}</span>`).join('')}
                         </div>
-                        ${v.gkhl_achiever_details && v.gkhl_achiever_details.length > 0 ? `
-                            <div class="mt-2 p-2 rounded border bg-success-subtle" style="font-size: 0.7rem;">
-                                <div class="fw-bold text-success mb-1"><i class="fas fa-trophy me-1"></i>Chi tiết KH đạt mức GKHL:</div>
-                                ${v.gkhl_achiever_details.map(kh => `
-                                    <div class="d-flex justify-content-between border-bottom py-1">
-                                        <span class="text-dark">${kh.CustCode}</span>
-                                        <span class="text-success fw-bold">${kh.achieved_net_formatted}đ / ${kh.limit_formatted}đ</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : ''}
                     </td>
                 </tr>
                 <tr class="detail-sub-row d-none" id="subrow-${index}">
@@ -905,6 +949,95 @@ document.addEventListener('DOMContentLoaded', function() {
         denNgayInput.min = firstDate;
         denNgayInput.max = lastDate;
     }
+});
+
+// ✅ CASCADING DROPDOWNS: Khu vực → Tỉnh → Nhân viên
+document.addEventListener('DOMContentLoaded', function() {
+    const filterKhuVuc = document.getElementById('filterKhuVuc');
+    const filterTinh = document.getElementById('filterTinh');
+    const filterBoPhan = document.getElementById('filterBoPhan');
+    const filterChucVu = document.getElementById('filterChucVu');
+    const filterNhanVien = document.getElementById('filterNhanVien');
+    
+    // Lưu giá trị selected ban đầu
+    const selectedNhanVien = '<?= htmlspecialchars($filters['nhan_vien'] ?? '') ?>';
+    
+    // Hàm cập nhật dropdown Tỉnh theo Khu vực
+    function updateTinhDropdown() {
+        const khuVuc = filterKhuVuc?.value || '';
+        
+        fetch(`nhanvien_kpi.php?action=getTinhByKhuVuc&khu_vuc=${encodeURIComponent(khuVuc)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && filterTinh) {
+                    const currentVal = filterTinh.value;
+                    filterTinh.innerHTML = '<option value="">-- Tất cả --</option>';
+                    data.data.forEach(tinh => {
+                        const opt = document.createElement('option');
+                        opt.value = tinh;
+                        opt.textContent = tinh;
+                        if (tinh === currentVal) opt.selected = true;
+                        filterTinh.appendChild(opt);
+                    });
+                }
+            })
+            .catch(console.error);
+    }
+    
+    // Hàm cập nhật dropdown Nhân viên theo các filter
+    function updateNhanVienDropdown() {
+        const khuVuc = filterKhuVuc?.value || '';
+        const tinh = filterTinh?.value || '';
+        const boPhan = filterBoPhan?.value || '';
+        const chucVu = filterChucVu?.value || '';
+        
+        const params = new URLSearchParams({
+            action: 'getNhanVienByFilters',
+            khu_vuc: khuVuc,
+            tinh: tinh,
+            bo_phan: boPhan,
+            chuc_vu: chucVu
+        });
+        
+        fetch(`nhanvien_kpi.php?${params}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && filterNhanVien) {
+                    filterNhanVien.innerHTML = '<option value="">-- Tất cả nhân viên --</option>';
+                    data.data.forEach(nv => {
+                        const opt = document.createElement('option');
+                        opt.value = nv.ma_nv;
+                        opt.textContent = `${nv.ho_ten} (${nv.ma_nv})`;
+                        if (nv.ma_nv === selectedNhanVien) opt.selected = true;
+                        filterNhanVien.appendChild(opt);
+                    });
+                }
+            })
+            .catch(console.error);
+    }
+    
+    // Event listeners
+    if (filterKhuVuc) {
+        filterKhuVuc.addEventListener('change', () => {
+            updateTinhDropdown();
+            updateNhanVienDropdown();
+        });
+    }
+    
+    if (filterTinh) {
+        filterTinh.addEventListener('change', updateNhanVienDropdown);
+    }
+    
+    if (filterBoPhan) {
+        filterBoPhan.addEventListener('change', updateNhanVienDropdown);
+    }
+    
+    if (filterChucVu) {
+        filterChucVu.addEventListener('change', updateNhanVienDropdown);
+    }
+    
+    // Load danh sách nhân viên ban đầu
+    updateNhanVienDropdown();
 });
 </script>
 </body>

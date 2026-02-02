@@ -26,6 +26,16 @@ switch ($action) {
         $controller->getOrderProducts();
         break;
 
+    case 'getTinhByKhuVuc':
+        // ✅ Lấy danh sách Tỉnh theo Khu vực (cascading dropdown)
+        $controller->getTinhByKhuVuc();
+        break;
+
+    case 'getNhanVienByFilters':
+        // ✅ Lấy danh sách Nhân viên theo các filter (cascading dropdown)
+        $controller->getNhanVienByFilters();
+        break;
+
     case 'report':
     default:
         // Hiển thị báo cáo KPI
