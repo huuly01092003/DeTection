@@ -1,0 +1,6 @@
+@echo off
+echo Dang khoi dong Cloudflare Tunnel...
+echo Vui long cho 1 lat de lay link truy cap...
+echo.
+cloudflared.exe tunnel --url http://localhost:80
+pause

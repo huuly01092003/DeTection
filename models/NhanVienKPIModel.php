@@ -422,7 +422,15 @@ class NhanVienKPIModel {
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($row && !empty($row['data'])) {
-                return json_decode($row['data'], true);
+                $data = $row['data'];
+                // Check for GZIP compression
+                if (strpos($data, 'GZIP:') === 0) {
+                    $compressed = substr($data, 5);
+                    $decoded = base64_decode($compressed);
+                    $uncompressed = gzuncompress($decoded);
+                    return json_decode($uncompressed, true);
+                }
+                return json_decode($data, true);
             }
         } catch (Exception $e) {
             error_log("KPI database backup fetch error: " . $e->getMessage());
@@ -466,8 +474,14 @@ class NhanVienKPIModel {
                     warning_count = VALUES(warning_count),
                     calculated_at = CURRENT_TIMESTAMP";
             
-            // Tăng giới hạn gói tin cho việc save cache
-            $this->conn->exec("SET SESSION max_allowed_packet=67108864");
+            // Tăng giới hạn gói tin cho việc save cache (cố gắng set, nếu server ko cho thì thôi)
+            try {
+                $this->conn->exec("SET SESSION max_allowed_packet=67108864");
+            } catch (Exception $e) {}
+            
+            // NÉN DỮ LIỆU ĐỂ GIẢM SIZE (Fix lỗi max_allowed_packet)
+            $jsonData = json_encode($dbData, JSON_UNESCAPED_UNICODE);
+            $compressedData = 'GZIP:' . base64_encode(gzcompress($jsonData, 9));
             
             $stmt = $this->conn->prepare($sql);
             $stmt->execute([
@@ -476,7 +490,7 @@ class NhanVienKPIModel {
                 $den_ngay,
                 $product_filter ?: null,
                 $threshold_n,
-                json_encode($dbData, JSON_UNESCAPED_UNICODE),
+                $compressedData,
                 count($data),
                 $criticalCount,
                 $warningCount
