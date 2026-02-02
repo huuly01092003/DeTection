@@ -44,134 +44,157 @@ $isViewer = isViewer();
     <!-- ✅ Load Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ✅ PREMIUM UI UPGRADE 2026 */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --card-radius: 16px;
+            --shadow-soft: 0 10px 40px rgba(0,0,0,0.08);
+            --shadow-hover: 0 20px 50px rgba(0,0,0,0.15);
+        }
+        
         body { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            background: #f3f4f6; 
             min-height: 100vh; 
             padding: 20px; 
+            font-family: 'Inter', 'Segoe UI', sans-serif;
         }
+        
         .card { 
-            background: white; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+            background: var(--glass-bg); 
+            border-radius: var(--card-radius); 
+            box-shadow: var(--shadow-soft); 
+            border: none;
             margin-bottom: 25px; 
+            backdrop-filter: blur(10px);
         }
+        
         .card-header { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            background: var(--primary-gradient); 
             color: white; 
-            padding: 30px; 
-            border-radius: 20px 20px 0 0; 
+            padding: 25px 30px; 
+            border-radius: var(--card-radius) var(--card-radius) 0 0; 
+            border: none;
         }
+
         .filter-section { 
-            background: #f8f9fa; 
-            padding: 20px; 
-            border-radius: 10px; 
+            background: #f8fafc; 
+            padding: 25px; 
+            border-radius: 12px; 
             margin-bottom: 20px; 
+            border: 1px solid #e2e8f0;
         }
+
         .info-box { 
             background: white; 
             padding: 20px; 
-            border-radius: 10px; 
+            border-radius: 16px; 
             text-align: center; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08); 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(0,0,0,0.03);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .info-box:hover {
+            transform: translateY(-5px); 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
+            border-color: rgba(102, 126, 234, 0.2);
         }
         .info-box h5 { 
             margin-bottom: 5px; 
-            font-weight: 700; 
-            color: #667eea; 
+            font-weight: 800; 
+            color: #2d3748;
+            font-size: 1.5rem;
         }
-        .info-box small { color: #666; }
+        .info-box small { 
+            color: #718096; 
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
         
+        .kpi-table { border-collapse: separate; border-spacing: 0; }
         .kpi-table thead th { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            background: var(--primary-gradient); 
             color: white !important; 
-            font-weight: 700; 
+            font-weight: 600; 
             border: none; 
             padding: 15px; 
             text-align: center; 
-            position: sticky; 
-            top: 0; 
-            z-index: 10; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            vertical-align: middle;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .kpi-table tbody tr { 
-            border-bottom: 1px solid #e0e0e0; 
-            transition: background 0.2s; 
-        }
-        .kpi-table tbody tr:hover { 
-            background: rgba(102, 126, 234, 0.05); 
-        }
+        .kpi-table tbody tr td { padding: 15px 10px; vertical-align: middle; border-bottom: 1px solid #eee; }
+        .kpi-table tbody tr:hover { background: #f8fafc !important; }
         
-        .bg-red-highlight { 
-            background: #fff5f5 !important; 
-            border-left: 5px solid #dc3545 !important; 
-        }
-        .bg-orange-highlight { 
-            background: #fffaf0 !important; 
-            border-left: 5px solid #ff9800 !important; 
-        }
-        .bg-none-highlight { 
-            background: #f0f7ff !important; 
-            border-left: 5px solid #667eea !important;
-        }
+        .bg-red-highlight { background: #fff5f5 !important; border-left: 5px solid #dc3545 !important; }
+        .bg-orange-highlight { background: #fffaf0 !important; border-left: 5px solid #ff9800 !important; }
+        .bg-none-highlight { background: #f0f7ff !important; border-left: 5px solid #667eea !important; }
         
-        /* 📜 Dòng lịch sử - Mờ hơn để phân biệt với tháng chính */
-        .history-row {
-            background-color: #fcfcfc !important;
-            opacity: 0.85;
-            border-left: 2px solid #dee2e6 !important;
-        }
-        .history-row.bg-danger-subtle {
-            background-color: #fffafb !important;
-            border-left: 2px solid #ffccd5 !important;
-        }
+        /* 📜 Dòng lịch sử */
+        .history-row { background-color: #fcfcfc !important; opacity: 0.9; border-left: 2px solid #dee2e6 !important; }
+        .history-row td { padding-top: 5px !important; padding-bottom: 5px !important; font-size: 0.9rem; }
         
         .legend { 
-            display: flex; 
-            gap: 20px; 
-            margin-bottom: 20px; 
-            padding: 15px; 
-            background: #f8f9fa; 
-            border-radius: 10px; 
-            flex-wrap: wrap; 
-        }
-        .legend-item { 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-        }
-        .legend-color { 
-            width: 40px; 
-            height: 30px; 
-            border-radius: 5px; 
-            border-left: 4px solid; 
+            display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; 
+            background: #f8fafc; border-radius: 12px; flex-wrap: wrap; border: 1px solid #e2e8f0;
         }
         
-        .btn-group-custom { 
-            margin-top: 20px; 
-            display: flex; 
-            gap: 10px; 
-            flex-wrap: wrap; 
-        }
-        
-        .debug-info { 
-            background: #f8f9fa; 
-            border-left: 4px solid #667eea; 
-            padding: 10px 15px; 
-            margin-top: 20px; 
-            border-radius: 4px; 
-            font-size: 0.9rem; 
-            color: #555; 
-        }
-        
-        .empty-state { 
-            text-align: center; 
-            padding: 60px 20px; 
-            color: #999; 
-        }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
         .empty-state i { 
-            font-size: 4rem; 
-            color: #ddd; 
-            margin-bottom: 20px; 
+            background: -webkit-linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 5rem; 
+            margin-bottom: 25px; 
+        }
+
+        /* ✅ MOBILE & TABLET OPTIMIZATION */
+        @media (max-width: 768px) {
+            body { padding: 10px; background: #fff; }
+            .card { border-radius: 0; box-shadow: none; background: transparent; }
+            .card-header { border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2); }
+            .card-header h2 { font-size: 1.5rem; }
+            
+            .info-box { padding: 15px; min-height: 100px; border-radius: 12px; }
+            .info-box h5 { font-size: 1.3rem; }
+            
+            .filter-section { padding: 15px; background: white; border: none; }
+            .btn { width: 100%; margin-top: 10px; }
+            .legend { flex-direction: column; gap: 10px; }
+
+            /* Mobile Card View */
+            .mobile-user-card {
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+                margin-bottom: 20px;
+                border: 1px solid #f0f0f0;
+                overflow: hidden;
+            }
+            .mobile-card-header {
+                padding: 15px;
+                background: #fcfcfc;
+                border-bottom: 1px solid #f0f0f0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .mobile-card-body { padding: 15px; }
+            .mobile-stat-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 8px;
+                font-size: 0.9rem;
+                align-items: center;
+            }
+            .mobile-stat-label { color: #666; font-weight: 500; }
+            .mobile-stat-value { font-weight: 700; color: #333; }
         }
     </style>
 </head>
@@ -286,29 +309,29 @@ $isViewer = isViewer();
                     <div class="tab-pane fade show active" id="table-pane" role="tabpanel" aria-labelledby="table-tab">
                         <!-- ✅ Tổng Quan -->
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="info-box">
                             <small><i class="fas fa-calendar-days"></i> Số Ngày</small>
                             <h5><?= intval($so_ngay) ?> ngày</h5>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="info-box">
-                            <small><i class="fas fa-money-bill-wave"></i> Tổng Tiền Kỳ (Tháng)</small>
-                            <h5><?= number_format($tong_tien_ky, 0) ?>đ</h5>
-                            <small class="text-muted">Chỉ tính tháng: <?= date('m/Y', strtotime($thang . '-01')) ?></small>
+                            <small><i class="fas fa-money-bill-wave"></i> Tổng Tiền Kỳ</small>
+                            <h5 style="font-size: 1.2rem;"><?= number_format($tong_tien_ky, 0) ?></h5>
+                            <small class="text-muted"><?= date('m/Y', strtotime($thang . '-01')) ?></small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="info-box">
-                            <small><i class="fas fa-hourglass-half"></i> Tổng Tiền Khoảng</small>
-                            <h5><?= number_format($tong_tien_khoang, 0) ?>đ</h5>
-                            <small class="text-muted"><?= $tu_ngay ?> ~ <?= $den_ngay ?></small>
+                            <small><i class="fas fa-hourglass-half"></i> Tổng Khoảng</small>
+                            <h5 style="font-size: 1.2rem;"><?= number_format($tong_tien_khoang, 0) ?></h5>
+                            <small class="text-muted"><?= date('d/m', strtotime($tu_ngay)) ?>-<?= date('d/m', strtotime($den_ngay)) ?></small>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="info-box">
-                            <small><i class="fas fa-exclamation-triangle"></i> Kết Quả Chung</small>
+                            <small><i class="fas fa-exclamation-triangle"></i> Kết Quả</small>
                             <h5><span class="badge bg-warning text-dark"><?= number_format($ket_qua_chung * 100, 2) ?>%</span></h5>
                             <small class="text-muted">Khoảng/Kỳ</small>
                         </div>
@@ -325,7 +348,7 @@ $isViewer = isViewer();
                     </div>
                     <div class="col-md-6">
                         <div class="info-box">
-                            <small><i class="fas fa-user-secret"></i> Số Người Nghi Vấn Gian Lận</small>
+                            <small><i class="fas fa-user-secret"></i> Số Nhân Viên Nghi Vấn Bất Thường</small>
                             <h5><span class="badge bg-danger" style="font-size: 18px;"><?= $tong_nghi_van ?> người</span></h5>
                         </div>
                     </div>
@@ -335,11 +358,11 @@ $isViewer = isViewer();
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background: linear-gradient(90deg, #fee 0%, #fdd 100%); border-left-color: #dc3545;"></div>
-                        <span><strong>Đỏ:</strong> Top <?= $top_threshold ?> Gian Lận Nghiêm Trọng</span>
+                        <span><strong>Đỏ:</strong> Top <?= $top_threshold ?> Nghi Vấn Bất Thường Nghiêm Trọng</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: linear-gradient(90deg, #fff5e6 0%, #ffe6cc 100%); border-left-color: #ff9800;"></div>
-                        <span><strong>Cam:</strong> Nghi Vấn Gian Lận Còn Lại (<?= max(0, $tong_nghi_van - $top_threshold) ?> người)</span>
+                        <span><strong>Cam:</strong> Nghi Vấn Bất Thường Còn Lại (<?= max(0, $tong_nghi_van - $top_threshold) ?> người)</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #f0f7ff; border-left-color: #667eea;"></div>
@@ -348,7 +371,7 @@ $isViewer = isViewer();
                 </div>
 
                 <!-- ✅ Bảng Báo Cáo -->
-                <div class="table-responsive" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
+                <div class="table-responsive d-none d-md-block" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
                     <table class="table table-hover kpi-table" style="margin-bottom: 0;">
                         <thead class="table-light">
                             <tr>
@@ -495,6 +518,62 @@ $isViewer = isViewer();
                         <?php endif; ?>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- ✅ MOBILE CARD VIEW (Dành cho điện thoại) -->
+                <div class="mobile-list-view d-md-none mt-4">
+                    <?php if (!empty($report)): ?>
+                        <?php foreach ($report as $r): 
+                             if (isset($r['highlight_type'])) {
+                                $borderClass = ($r['highlight_type'] === 'red') ? 'border-danger' : (($r['highlight_type'] === 'orange') ? 'border-warning' : 'border-primary');
+                                $bgClass = ($r['highlight_type'] === 'red') ? '#fff5f5' : 'white';
+                            } else {
+                                $borderClass = 'border-light';
+                                $bgClass = 'white';
+                            }
+                        ?>
+                        <div class="mobile-user-card" style="border-left: 5px solid <?= ($r['is_suspect'] ? '#dc3545' : '#198754') ?>; background: <?= $bgClass ?>">
+                            <div class="mobile-card-header">
+                                <div>
+                                    <h6 class="mb-0 fw-bold"><?= htmlspecialchars($r['ten_nv']) ?></h6>
+                                    <small class="text-muted"><?= htmlspecialchars($r['ma_nv']) ?></small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge <?= ($r['ty_le'] >= $ty_le_nghi_van) ? 'bg-danger' : 'bg-success' ?>">
+                                        <?= number_format($r['ty_le'] * 100, 0) ?>%
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mobile-card-body">
+                                <div class="mobile-stat-row">
+                                    <span class="mobile-stat-label">Doanh Số (Khoảng):</span>
+                                    <span class="mobile-stat-value text-primary"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</span>
+                                </div>
+                                <div class="mobile-stat-row">
+                                    <span class="mobile-stat-label">DS Tiến Độ:</span>
+                                    <span class="mobile-stat-value"><?= number_format($r['ds_tien_do'], 0) ?>đ</span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-3 align-items-center">
+                                    <div>
+                                        <?php if ($r['rank'] > 0): ?>
+                                            <span class="badge bg-secondary">Rank #<?= $r['rank'] ?></span>
+                                        <?php endif; ?>
+                                        <span class="badge bg-light text-dark border"><?= htmlspecialchars($r['bo_phan']) ?></span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            type="button"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#detailModal"
+                                            onclick="showReportDetails('<?= htmlspecialchars(json_encode($r), ENT_QUOTES) ?>', '<?= htmlspecialchars(json_encode($tong_tien_ky_detailed), ENT_QUOTES) ?>')">
+                                        Chi Tiết
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="text-center py-5 text-muted">Không có dữ liệu nhân viên</div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- ✅ Debug Info -->

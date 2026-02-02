@@ -40,167 +40,257 @@ $isViewer = isViewer();
     <?php endif; ?>
     
     <style>
+        /* ✅ PREMIUM UI UPGRADE 2026 */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --card-radius: 16px;
+            --shadow-soft: 0 10px 40px rgba(0,0,0,0.08);
+            --shadow-hover: 0 20px 50px rgba(0,0,0,0.15);
+        }
+        
         body { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            background: #f3f4f6; 
             min-height: 100vh; 
             padding: 20px; 
+            font-family: 'Inter', 'Segoe UI', sans-serif;
         }
+        
         .card { 
-            background: white; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+            background: var(--glass-bg); 
+            border-radius: var(--card-radius); 
+            box-shadow: var(--shadow-soft); 
+            border: none;
             margin-bottom: 25px; 
+            backdrop-filter: blur(10px);
         }
+        
         .card-header { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            background: var(--primary-gradient); 
             color: white; 
-            padding: 30px; 
-            border-radius: 20px 20px 0 0; 
+            padding: 25px 30px; 
+            border-radius: var(--card-radius) var(--card-radius) 0 0; 
+            border: none;
         }
+        
+        /* Premium KPI Cards */
         .kpi-card { 
             background: white; 
-            padding: 18px; 
-            border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08); 
+            padding: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
             text-align: center; 
-        }
-        .kpi-value { 
-            font-size: 2rem; 
-            font-weight: 700; 
-            color: #333; 
-        }
-        .kpi-label { 
-            font-size: 0.85rem; 
-            color: #666; 
-            margin-top: 5px; 
-        }
-        .threshold-box { 
-            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); 
-            padding: 15px; 
-            border-radius: 10px; 
-            border-left: 4px solid #ffc107; 
-        }
-        .violation-badge { 
-            background: #dc3545; 
-            color: white; 
-            padding: 4px 10px; 
-            border-radius: 12px; 
-            font-size: 0.8rem; 
-            font-weight: 600; 
-        }
-        .customer-row { 
-            border-bottom: 1px solid #eee; 
-            padding: 10px 0; 
-        }
-        .customer-row:hover { 
-            background: #f8f9fa; 
-        }
-        .order-chip { 
-            background: #e3f2fd; 
-            padding: 3px 8px; 
-            border-radius: 5px; 
-            font-size: 0.75rem; 
-            margin-right: 5px; 
-            border: 1px solid #bbdefb;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .order-chip:hover {
-            background: #2196f3;
-            color: white;
-        }
-        .clickable-row {
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .clickable-row:hover {
-            background-color: rgba(102, 126, 234, 0.1) !important;
-        }
-        
-        /* Modal Resizable/Draggable handles */
-        .modal-content {
-            resize: both;
-            overflow: hidden; /* Hide overflow to allow resizing of content via body */
-            min-width: 500px;
-            min-height: 300px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(0,0,0,0.03);
+            position: relative;
+            overflow: hidden;
+            height: 100%;
             display: flex;
             flex-direction: column;
-        }
-        .modal-body {
-            overflow-y: auto;
-            flex: 1;
-        }
-        .modal-header {
-            cursor: move;
-            flex-shrink: 0;
+            justify-content: center;
         }
         
+        .kpi-card:hover { 
+            transform: translateY(-5px); 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
+            border-color: rgba(102, 126, 234, 0.2);
+        }
+        
+        .kpi-card-icon {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 3rem;
+            opacity: 0.1;
+            transform: rotate(-15deg);
+            transition: all 0.3s;
+        }
+        
+        .kpi-card:hover .kpi-card-icon {
+            transform: rotate(0deg) scale(1.1);
+            opacity: 0.15;
+        }
+        
+        .kpi-value { 
+            font-size: 1.8rem; 
+            font-weight: 800; 
+            color: #2d3748;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+        
+        .kpi-label { 
+            font-size: 0.85rem; 
+            color: #718096; 
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Filter Section Polish */
+        .filter-box {
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 25px !important;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-select, .form-control {
+            border-radius: 8px;
+            border: 1px solid #cbd5e0;
+            padding: 10px 15px;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            transition: all 0.2s;
+        }
+        
+        .form-select:focus, .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        /* Table Polish */
+        .table thead th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            padding: 15px 10px;
+        }
+        
+        .table tbody td {
+            vertical-align: middle;
+            padding: 15px 10px;
+            font-size: 0.9rem;
+        }
+        
+        .violation-badge { 
+            background: #fff5f5;
+            color: #e53e3e; 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 0.8rem; 
+            font-weight: 700;
+            border: 1px solid #fed7d7;
+            display: inline-block;
+        }
+        
+        .customer-row { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .customer-row:hover { background: #f8f9fa; }
+        .order-chip { background: #e3f2fd; padding: 3px 8px; border-radius: 5px; font-size: 0.75rem; margin-right: 5px; border: 1px solid #bbdefb; cursor: pointer; transition: all 0.2s; }
+        .order-chip:hover { background: #2196f3; color: white; }
+        .clickable-row { cursor: pointer; transition: background 0.2s; }
+        .clickable-row:hover { background-color: rgba(102, 126, 234, 0.1) !important; }
+
+        /* Modal Resizable/Draggable handles */
+        .modal-content { resize: both; overflow: hidden; min-width: 500px; min-height: 300px; display: flex; flex-direction: column; }
+        .modal-body { overflow-y: auto; flex: 1; }
+        .modal-header { cursor: move; flex-shrink: 0; }
+        
         /* Unified Investigation Hub Styles */
-        .investigation-level {
-            transition: all 0.3s ease-in-out;
-        }
-        .breadcrumb-item a:hover {
-            color: white !important;
-            text-decoration: underline !important;
-        }
-        .breadcrumb-item.active {
-            color: white !important;
-            font-weight: bold;
-        }
-        .investigation-modal .modal-content {
-            border-radius: 15px;
-        }
-        .detail-sub-row {
-            background-color: #f8f9fa;
-        }
-        .detail-container {
-            padding: 15px;
-            border-left: 4px solid #3b82f6;
-            margin: 10px;
-            background: white;
-            border-radius: 0 8px 8px 0;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .order-products-container {
-            margin-top: 10px;
-            padding: 10px;
-            background: #e9ecef;
-            border-radius: 6px;
-            display: none;
-        }
-        .expand-icon {
-            transition: transform 0.3s;
-        }
-        .expanded .expand-icon {
-            transform: rotate(90deg);
-        }
-        .gkhl-badge {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 4px;
-        }
-        .mst-badge {
-            background: #e9ecef;
-            color: #495057;
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: inline-block;
-        }
+        .investigation-level { transition: all 0.3s ease-in-out; }
+        .breadcrumb-item a:hover { color: white !important; text-decoration: underline !important; }
+        .breadcrumb-item.active { color: white !important; font-weight: bold; }
+        .investigation-modal .modal-content { border-radius: 15px; }
+        .detail-sub-row { background-color: #f8f9fa; }
+        .detail-container { padding: 15px; border-left: 4px solid #3b82f6; margin: 10px; background: white; border-radius: 0 8px 8px 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+        .order-products-container { margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 6px; display: none; }
+        .expand-icon { transition: transform 0.3s; }
+        .expanded .expand-icon { transform: rotate(90deg); }
+        .gkhl-badge { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+        .mst-badge { background: #e9ecef; color: #495057; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+
         .empty-state { 
             text-align: center; 
             padding: 60px 20px; 
             color: #999; 
         }
         .empty-state i { 
-            font-size: 4rem; 
-            color: #ddd; 
-            margin-bottom: 20px; 
+            background: -webkit-linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 5rem;
+            margin-bottom: 25px;
+        }
+        
+        /* ✅ MOBILE & TABLET OPTIMIZATION */
+        @media (max-width: 768px) {
+            body { padding: 10px; background: #fff; }
+            .card { border-radius: 0; box-shadow: none; background: transparent; }
+            .card-header { border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2); }
+            .card-header h2 { font-size: 1.5rem; }
+            
+            .kpi-card { 
+                padding: 15px; 
+                min-height: 110px;
+                border-radius: 12px;
+                background: white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            }
+            
+            .kpi-value { font-size: 1.5rem; }
+            .kpi-card-icon { font-size: 2rem; }
+            
+            .filter-box { padding: 15px !important; background: white; border: none; }
+            
+            /* Form inputs */
+            .form-label { font-size: 0.85rem; margin-bottom: 2px; }
+            .btn { width: 100%; margin-top: 10px; }
+            
+            /* Modal adjustments */
+            .modal-dialog { margin: 0.5rem; }
+            .modal-content { height: 90vh !important; }
+            
+            .mobile-user-card {
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 4px 25px rgba(0,0,0,0.05);
+                margin-bottom: 20px;
+                border: 1px solid #f0f0f0;
+                transition: transform 0.2s;
+            }
+             .mobile-card-header {
+                padding: 12px;
+                border-bottom: 1px solid #f0f0f0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #fcfcfc;
+            }
+            .mobile-card-body { padding: 12px; }
+            .mobile-stat-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 8px;
+                font-size: 0.9rem;
+            }
+            .mobile-stat-label { color: #666; }
+            .mobile-stat-value { font-weight: 600; color: #333; }
+            
+            .mobile-user-card:active { transform: scale(0.98); }
         }
     </style>
 </head>
@@ -222,7 +312,7 @@ $isViewer = isViewer();
             <?php endif; ?>
 
             <!-- FORM FILTER -->
-            <form method="get" class="p-4" style="background: #f8f9fa; border-radius: 10px;">
+            <form method="get" class="p-4 filter-box">
                 <div class="row g-3">
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-calendar-alt"></i> Tháng</label>
@@ -347,48 +437,55 @@ $isViewer = isViewer();
                     <p class="text-muted">Hệ thống sẽ phân tích khi bạn nhấn "Phân Tích"</p>
                 </div>
             <?php else: ?>
-                <!-- KPI CARDS -->
+                <!-- KPI CARDS WITH ICONS -->
                 <div class="row g-3 mt-3">
-                    <div class="col-md-2">
+                    <div class="col-6 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-users kpi-card-icon text-primary"></i>
                             <div class="kpi-value text-primary"><?= intval($statistics['employees_with_orders']) ?></div>
                             <div class="kpi-label">Nhân Viên</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-6 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-coins kpi-card-icon text-info"></i>
                             <div class="kpi-value text-info" style="font-size: 1.2rem;"><?= number_format($statistics['total_gross']) ?></div>
-                            <div class="kpi-label">Tổng Gross (Tiền)</div>
+                            <div class="kpi-label">Tổng Gross</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-6 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-tags kpi-card-icon text-success"></i>
                             <div class="kpi-value text-success" style="font-size: 1.2rem;"><?= number_format($statistics['total_scheme']) ?></div>
-                            <div class="kpi-label">Tổng KM (Tiền)</div>
+                            <div class="kpi-label">Tổng KM</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-6 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-wallet kpi-card-icon text-primary"></i>
                             <div class="kpi-value text-primary" style="font-size: 1.2rem;"><?= number_format($statistics['total_net']) ?></div>
-                            <div class="kpi-label">Tổng Net (Thực thu)</div>
+                            <div class="kpi-label">Tổng Net</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-4 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-exclamation-triangle kpi-card-icon text-warning"></i>
                             <div class="kpi-value text-warning"><?= intval($statistics['warning_count']) ?></div>
                             <div class="kpi-label">Cảnh Báo</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-4 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-fire kpi-card-icon text-danger"></i>
                             <div class="kpi-value text-danger"><?= intval($statistics['danger_count']) ?></div>
                             <div class="kpi-label">Nghiêm Trọng</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-4 col-md-2">
                         <div class="kpi-card">
+                            <i class="fas fa-check-circle kpi-card-icon text-secondary"></i>
                             <div class="kpi-value"><?= intval($statistics['normal_count']) ?></div>
-                            <div class="kpi-label">Bình Thường</div>
+                            <div class="kpi-label">BT</div>
                         </div>
                     </div>
                 </div>
