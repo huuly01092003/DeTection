@@ -558,8 +558,19 @@ function showDetail(data) {
                     <td class="text-end fw-bold text-warning">${(v.day_scheme_rate * 100).toFixed(1)}%</td>
                     <td>
                         <div class="small">
-                            ${v.reasons.map(r => `<span class="badge ${r.includes('✂️') ? 'bg-info' : (r.includes('💰') ? 'bg-warning text-dark' : 'bg-light text-dark')} border me-1">${r}</span>`).join('')}
+                            ${v.reasons.map(r => `<span class="badge ${r.includes('✂️') ? 'bg-info' : (r.includes('💰') ? 'bg-warning text-dark' : (r.includes('🎯') ? 'bg-success' : 'bg-light text-dark'))} border me-1">${r}</span>`).join('')}
                         </div>
+                        ${v.gkhl_achiever_details && v.gkhl_achiever_details.length > 0 ? `
+                            <div class="mt-2 p-2 rounded border bg-success-subtle" style="font-size: 0.7rem;">
+                                <div class="fw-bold text-success mb-1"><i class="fas fa-trophy me-1"></i>Chi tiết KH đạt mức GKHL:</div>
+                                ${v.gkhl_achiever_details.map(kh => `
+                                    <div class="d-flex justify-content-between border-bottom py-1">
+                                        <span class="text-dark">${kh.CustCode}</span>
+                                        <span class="text-success fw-bold">${kh.achieved_net_formatted}đ / ${kh.limit_formatted}đ</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
                     </td>
                 </tr>
                 <tr class="detail-sub-row d-none" id="subrow-${index}">
@@ -645,12 +656,15 @@ function renderInlineCustomers(container, customers) {
             let statusHtml = '';
             if (achievedDate) {
                 statusHtml = `<div class="badge bg-success text-white mt-1"><i class="fas fa-check-circle me-1"></i>Đạt ngày ${achievedDate}</div>`;
+            } else if (progress >= 100) {
+                // KH đạt mức qua giao dịch với nhiều NV, không có ngày cụ thể với NV này
+                statusHtml = `<div class="badge bg-success text-white mt-1"><i class="fas fa-check-circle me-1"></i>Đã đạt GKHL (${progress.toFixed(1)}%)</div>`;
             } else if (progress > 0) {
                 statusHtml = `
                     <div class="progress mt-2" style="height: 6px;">
                         <div class="progress-bar ${progress >= 80 ? 'bg-warning' : 'bg-info'}" style="width: ${Math.min(progress, 100)}%"></div>
                     </div>
-                    <div class="small text-muted mt-1">Tiến độ: ${progress}%</div>
+                    <div class="small text-muted mt-1">Tiến độ: ${progress.toFixed(1)}%</div>
                 `;
             }
             
