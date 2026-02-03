@@ -700,14 +700,67 @@ $isViewer = isViewer();
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="modalContent" style="max-height: 80vh; overflow-y: auto;">
-                <!-- Content will be loaded here -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Draggable Modal Logic for #detailModal
+document.addEventListener('mousedown', function (e) {
+    const header = e.target.closest('.modal-header');
+    if (!header) return;
+    
+    // Ensure we are targeting the specific modal
+    const modalContent = header.closest('#detailModal .modal-content');
+    if (!modalContent) return;
+    
+    // Check if we are clicking on Close button
+    if (e.target.closest('.btn-close')) return;
+
+    e.preventDefault(); // Prevent text selection
+
+    let initialX = e.clientX;
+    let initialY = e.clientY;
+    
+    const rect = modalContent.getBoundingClientRect();
+    
+    // If modal is centered (margin auto), we need to switch to absolute positioning
+    const style = window.getComputedStyle(modalContent);
+    const matrix = new WebKitCSSMatrix(style.transform);
+    
+    // Store cursor offset relative to the top-left of the modal
+    let offsetX = initialX - rect.left;
+    let offsetY = initialY - rect.top;
+
+    function onMouseMove(e) {
+        modalContent.style.position = 'absolute';
+        modalContent.style.margin = '0'; // Remove Bootstrap's auto margins
+        modalContent.style.left = (e.clientX - offsetX) + 'px';
+        modalContent.style.top = (e.clientY - offsetY) + 'px';
+        modalContent.style.transform = 'none'; // Remove any transform centering
+    }
+
+    function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    
+    // Change cursor
+    header.style.cursor = 'move';
+});
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
