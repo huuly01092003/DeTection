@@ -41,7 +41,6 @@ $currentUser = AuthMiddleware::getCurrentUser();
             border-radius: 15px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
             border-left: 4px solid #667eea;
         }
         
@@ -284,7 +283,6 @@ $currentUser = AuthMiddleware::getCurrentUser();
     border-radius: 15px;
     padding: 20px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
     border-left: 4px solid #667eea;
     transition: all 0.3s ease;
 }
@@ -505,13 +503,13 @@ renderSmartNavbar('system', ['breadcrumb' => $breadcrumb]);
 <div class="container-fluid mt-4">
     <!-- Page Header -->
     <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <h2><i class="fas fa-cogs me-2"></i>Quản Lý Hệ Thống</h2>
-                <p class="mb-0">Quản lý dữ liệu, cache và bảng summary</p>
+                <h2 class="h3 mb-1"><i class="fas fa-cogs me-2"></i>Quản Lý Hệ Thống</h2>
+                <p class="mb-0 small opacity-75">Quản lý dữ liệu, cache và bảng summary</p>
             </div>
             <div>
-                <span class="badge bg-light text-dark px-3 py-2">
+                <span class="badge bg-light text-dark px-3 py-2 shadow-sm">
                     <i class="fas fa-user-shield me-2"></i>
                     <?= htmlspecialchars($currentUser['full_name']) ?>
                 </span>
@@ -550,39 +548,40 @@ renderSmartNavbar('system', ['breadcrumb' => $breadcrumb]);
     </ul>
 
     <!-- System Statistics -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="stat-card">
+    <!-- System Statistics -->
+    <div class="row mb-4 g-3">
+        <div class="col-6 col-md-3">
+            <div class="stat-card h-100">
                 <h3 class="mb-1"><?= number_format(array_sum(array_column($stats['tables'], 'count'))) ?></h3>
-                <p class="mb-0 text-muted">
-                    <i class="fas fa-database me-1"></i>Tổng Số Bản Ghi
+                <p class="mb-0 text-muted small">
+                    <i class="fas fa-database me-1"></i>Tổng Bản Ghi
                 </p>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="stat-card">
+        <div class="col-6 col-md-3">
+            <div class="stat-card h-100">
                 <h3 class="mb-1"><?= count($stats['tables']) ?></h3>
-                <p class="mb-0 text-muted">
-                    <i class="fas fa-table me-1"></i>Số Bảng Quản Lý
+                <p class="mb-0 text-muted small">
+                    <i class="fas fa-table me-1"></i>Số Bảng
                 </p>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="stat-card">
+        <div class="col-6 col-md-3">
+            <div class="stat-card h-100">
                 <h3 class="mb-1">
                     <?= $stats['redis']['connected'] ? 
-                        '<span class="text-success">Connected</span>' : 
-                        '<span class="text-danger">Disconnected</span>' ?>
+                        '<span class="text-success">OK</span>' : 
+                        '<span class="text-danger">Err</span>' ?>
                 </h3>
-                <p class="mb-0 text-muted">
-                    <i class="fas fa-server me-1"></i>Redis Status
+                <p class="mb-0 text-muted small">
+                    <i class="fas fa-server me-1"></i>Redis
                 </p>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="stat-card">
+        <div class="col-6 col-md-3">
+            <div class="stat-card h-100">
                 <h3 class="mb-1"><?= number_format($stats['redis']['total_keys']) ?></h3>
-                <p class="mb-0 text-muted">
+                <p class="mb-0 text-muted small">
                     <i class="fas fa-key me-1"></i>Redis Keys
                 </p>
             </div>
@@ -617,30 +616,31 @@ renderSmartNavbar('system', ['breadcrumb' => $breadcrumb]);
 
                 <?php foreach ($stats['tables'] as $table => $info): ?>
                     <div class="table-info">
-                        <div class="row align-items-center">
-                            <div class="col-md-5">
-                                <h6 class="mb-1">
+                        <div class="row align-items-center g-2">
+                            <div class="col-12 col-md-5">
+                                <h6 class="mb-1 text-truncate">
                                     <i class="fas fa-table me-2 text-primary"></i>
                                     <?= htmlspecialchars($info['name']) ?>
                                 </h6>
-                                <small class="text-muted">Table: <code><?= $table ?></code></small>
+                                <small class="text-muted text-truncate d-block">Table: <code><?= $table ?></code></small>
                             </div>
-                            <div class="col-md-3 text-center">
+                            <div class="col-6 col-md-3 text-start text-md-center">
                                 <div>
-                                    <strong style="font-size: 1.3rem;"><?= number_format($info['count']) ?></strong>
-                                    <small class="d-block text-muted">bản ghi</small>
+                                    <strong style="font-size: 1.1rem;"><?= number_format($info['count']) ?></strong>
+                                    <small class="d-none d-md-block text-muted">bản ghi</small>
+                                    <span class="d-md-none text-muted small"> dòng</span>
                                 </div>
                             </div>
-                            <div class="col-md-2 text-center">
+                            <div class="col-6 col-md-2 text-end text-md-center">
                                 <div>
-                                    <strong style="font-size: 1.2rem; color: #667eea;"><?= $info['size'] ?> MB</strong>
-                                    <small class="d-block text-muted">dung lượng</small>
+                                    <strong style="font-size: 1.1rem; color: #667eea;"><?= $info['size'] ?> MB</strong>
+                                    <small class="d-none d-md-block text-muted">dung lượng</small>
                                 </div>
                             </div>
-                            <div class="col-md-2 text-end">
-                                <button class="btn btn-danger" 
+                            <div class="col-12 col-md-2 text-end mt-2 mt-md-0">
+                                <button class="btn btn-outline-danger btn-sm w-100" 
                                         onclick="confirmClearTable('<?= $table ?>', '<?= $info['name'] ?>')">
-                                    <i class="fas fa-trash me-1"></i>Xóa Toàn Bộ
+                                    <i class="fas fa-trash me-1"></i>Xóa
                                 </button>
                             </div>
                         </div>
@@ -682,25 +682,27 @@ renderSmartNavbar('system', ['breadcrumb' => $breadcrumb]);
 
                     <!-- Cache Summary Table -->
                     <div class="cache-summary-table mb-4">
-                        <table class="table table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40%;">Cache Type</th>
-                                    <th style="width: 15%; text-align: center;">Keys</th>
-                                    <th style="width: 15%; text-align: center;">Total Size</th>
-                                    <th style="width: 30%; text-align: center;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cacheSummaryBody">
-                                <tr>
-                                    <td colspan="4" class="text-center">
-                                        <button class="btn btn-primary" onclick="loadCacheSummary()">
-                                            <i class="fas fa-sync me-2"></i>Tải Thống Kê Cache
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 text-nowrap">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40%;">Cache Type</th>
+                                        <th style="width: 15%; text-align: center;">Keys</th>
+                                        <th style="width: 15%; text-align: center;">Total Size</th>
+                                        <th style="width: 30%; text-align: center;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cacheSummaryBody">
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <button class="btn btn-primary" onclick="loadCacheSummary()">
+                                                <i class="fas fa-sync me-2"></i>Tải Thống Kê Cache
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <!-- Detailed Keys Section -->

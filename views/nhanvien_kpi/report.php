@@ -606,23 +606,23 @@ function showDetail(data) {
         <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; border-left: 5px solid #1e3a8a !important;">
             <div class="card-body p-3">
                 <div class="row align-items-center">
-                    <div class="col-md-auto text-center border-end pe-4">
+                    <div class="col-12 col-md-auto text-center border-end-md pe-md-4 mb-3 mb-md-0">
                         <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" style="width: 50px; height: 50px;">
                             <i class="fas fa-user-tie fa-lg"></i>
                         </div>
                         <div class="fw-bold text-dark">${data.DSRCode}</div>
                     </div>
-                    <div class="col-md ps-4">
-                        <div class="row">
-                            <div class="col-md-4">
+                    <div class="col-12 col-md ps-md-4">
+                        <div class="row g-2">
+                            <div class="col-12 col-md-4">
                                 <div class="small text-muted mb-1"><i class="fas fa-sitemap me-1"></i>Bộ phận / Chức vụ</div>
                                 <div class="fw-bold text-dark">${data.bo_phan} - ${data.chuc_vu}</div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-12 col-md-4">
                                 <div class="small text-muted mb-1"><i class="fas fa-user-shield me-1"></i>Quản lý trực tiếp</div>
                                 <div class="fw-bold text-dark">${data.ten_nv_ql} <small class="text-muted">[${data.ma_nv_ql}]</small></div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-12 col-md-4">
                                 <div class="small text-muted mb-1"><i class="fas fa-calendar-check me-1"></i>Ngày vào làm</div>
                                 <div class="fw-bold text-dark">${data.ngay_vao_cty || 'N/A'}</div>
                             </div>
@@ -632,37 +632,39 @@ function showDetail(data) {
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="p-3 border rounded-3 bg-white shadow-sm text-center h-100 d-flex flex-column justify-content-center">
-                    <div class="small text-muted fw-bold mb-1">TỔNG ĐIỂM</div>
+        <div class="row mb-4 g-3">
+            <div class="col-12 col-md-3">
+                <div class="p-3 border rounded-3 bg-white shadow-sm text-center h-100 d-flex flex-row flex-md-column justify-content-between justify-content-md-center align-items-center">
+                    <div class="text-start text-md-center">
+                        <div class="small text-muted fw-bold mb-1">TỔNG ĐIỂM</div>
+                        <span class="badge ${data.risk_level === 'critical' ? 'bg-danger' : 'bg-warning text-dark'} mt-1">${data.risk_level.toUpperCase()}</span>
+                    </div>
                     <div class="h3 mb-0 fw-bold ${data.risk_level === 'critical' ? 'text-danger' : 'text-warning'}">${data.risk_score}đ</div>
-                    <span class="badge ${data.risk_level === 'critical' ? 'bg-danger' : 'bg-warning text-dark'} mt-1 align-self-center">${data.risk_level.toUpperCase()}</span>
                 </div>
             </div>
-            <div class="col-md-9">
+            <div class="col-12 col-md-9">
                 <div class="row g-2">
-                    <div class="col-3">
-                        <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Vượt Ngưỡng</div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
+                            <div class="small text-muted text-truncate" title="Vượt Ngưỡng">Vượt Ngưỡng</div>
                             <div class="fw-bold text-danger">${Math.round(rb.threshold)}đ</div>
                         </div>
                     </div>
-                    <div class="col-3">
-                        <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Chẻ/Gộp Đơn</div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
+                            <div class="small text-muted text-truncate" title="Chẻ/Gộp Đơn">Chẻ/Gộp Đơn</div>
                             <div class="fw-bold text-info">${Math.round(rb.splitting)}đ</div>
                         </div>
                     </div>
-                    <div class="col-3">
-                        <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Lạm Dụng KM</div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
+                            <div class="small text-muted text-truncate" title="Lạm Dụng KM">Lạm Dụng KM</div>
                             <div class="fw-bold text-warning">${Math.round(rb.scheme)}đ</div>
                         </div>
                     </div>
-                    <div class="col-3">
-                        <div class="p-2 border rounded bg-white text-center shadow-sm">
-                            <div class="small text-muted">Liên Tiếp</div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
+                            <div class="small text-muted text-truncate" title="Liên Tiếp">Liên Tiếp</div>
                             <div class="fw-bold text-secondary">${Math.round(rb.consecutive)}đ</div>
                         </div>
                     </div>
@@ -675,22 +677,23 @@ function showDetail(data) {
                 <h6 class="fw-bold mb-0 text-dark">LịCH SỬ PHÁT HIỆN BẤT THƯỜNG</h6>
             </div>
             <div class="card-body p-0">
-                <table class="table table-hover align-middle mb-0" id="violationTable">
-                    <thead class="bg-light">
-                        <tr>
-                            <th style="width: 40px;"></th>
-                            <th>Ngày Phân Tích</th>
-                            <th class="text-end">Khách hàng</th>
-                            <th class="text-end">Đơn hàng</th>
-                            <th class="text-end">Tiền Gross</th>
-                            <th class="text-end">Tiền KM</th>
-                            <th class="text-end">Thực Thu (Net)</th>
-                            <th class="text-end">AOV</th>
-                            <th class="text-end">Tỷ lệ KM</th>
-                            <th>Lý do rủi ro</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 text-nowrap" id="violationTable" style="min-width: 800px;">
+                        <thead class="bg-light">
+                            <tr>
+                                <th style="width: 40px;"></th>
+                                <th>Ngày Phân Tích</th>
+                                <th class="text-end">Khách hàng</th>
+                                <th class="text-end">Đơn hàng</th>
+                                <th class="text-end">Tiền Gross</th>
+                                <th class="text-end">Tiền KM</th>
+                                <th class="text-end">Thực Thu (Net)</th>
+                                <th class="text-end">AOV</th>
+                                <th class="text-end">Tỷ lệ KM</th>
+                                <th>Lý do rủi ro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
     `;
     
     if (data.risk_analysis.violation_days && data.risk_analysis.violation_days.length > 0) {
@@ -730,7 +733,22 @@ function showDetail(data) {
         html += '<tr><td colspan="6" class="text-center py-4 text-success">Không có vi phạm nghiêm trọng</td></tr>';
     }
     
-    html += `</tbody></table></div></div>`;
+    html += `</tbody></table></div></div></div>`; // Added extra </div> for table-responsive
+    
+    // Inject custom style if not exists
+    if (!document.getElementById('kpi-mobile-styles')) {
+        const style = document.createElement('style');
+        style.id = 'kpi-mobile-styles';
+        style.innerHTML = `
+            @media (max-width: 767.98px) {
+                .border-end-md { border-right: none !important; border-bottom: 1px solid #dee2e6; padding-bottom: 1rem; margin-bottom: 1rem; }
+            }
+            @media (min-width: 768px) {
+                .border-end-md { border-right: 1px solid #dee2e6 !important; border-bottom: none !important; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
     
     document.getElementById('violationContent').innerHTML = html;
     new bootstrap.Modal(document.getElementById('violationModal')).show();
