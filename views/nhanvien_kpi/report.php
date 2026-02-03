@@ -358,12 +358,12 @@ $isViewer = isViewer();
                     
                     <div class="col-md-1" style="padding-top: 30px;">
                         <button type="submit" class="btn btn-primary w-100">
-                            <i class="fas fa-search"></i> Phân Tích
+                            <i class="fas fa-search"></i> 
                         </button>
                     </div>
                     <div class="col-md-1" style="padding-top: 30px;">
                         <a href="nhanvien_kpi.php" class="btn btn-secondary w-100">
-                            <i class="fas fa-sync"></i> Reset
+                            <i class="fas fa-sync"></i> 
                         </a>
                     </div>
                 </div>
@@ -569,8 +569,8 @@ $isViewer = isViewer();
 
 <!-- Modal Trung Tâm Điều Tra (Tất cả trong 1) -->
 <div class="modal fade investigation-modal" id="violationModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content overflow-hidden border-0 shadow-lg" style="height: 85vh;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 95vw;">
+        <div class="modal-content overflow-hidden border-0 shadow-lg" style="height: 90vh;">
             <div class="modal-header border-0 p-3" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
                 <h5 class="modal-title fw-bold text-white mb-0">
                     <i class="fas fa-shield-alt me-2"></i>Chi Tiết Điều Tra KPI: <span id="violationStaffName"></span>
@@ -718,7 +718,7 @@ function showDetail(data) {
                     </td>
                 </tr>
                 <tr class="detail-sub-row d-none" id="subrow-${index}">
-                    <td colspan="8">
+                    <td colspan="10">
                         <div class="detail-container" id="container-${index}">
                             <div class="text-center py-3">
                                 <div class="spinner-border spinner-border-sm text-primary"></div>
@@ -838,12 +838,13 @@ function renderInlineCustomers(container, customers) {
         
         html += `
             <div class="border-bottom py-3">
-                <div class="row">
+                <div class="row align-items-center mb-2">
+                    <!-- Top Row: Customer Info & Sales Summary -->
                     <div class="col-md-7">
-                        <div class="d-flex align-items-center mb-1">
-                            <div class="fw-bold text-dark h6 mb-0">${escapeHtml(c.customer_name)}</div>
-                            <small class="text-muted ms-2">[${c.CustCode}]</small>
-                            ${c.is_gkhl == 1 ? '<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem">GKHL</span>' : ''}
+                        <div class="d-flex align-items-center mb-1 flex-wrap">
+                            <div class="fw-bold text-dark h6 mb-0 me-2 text-break" style="max-width: 100%;">${escapeHtml(c.customer_name)}</div>
+                            <small class="text-muted text-nowrap me-2">[${c.CustCode}]</small>
+                            ${c.is_gkhl == 1 ? '<span class="badge bg-warning text-dark" style="font-size:0.6rem">GKHL</span>' : ''}
                         </div>
                         <div class="small text-muted mb-2"><i class="fas fa-map-marker-alt me-1"></i>${escapeHtml(c.customer_address)}</div>
                         <div class="d-flex flex-wrap gap-2">
@@ -851,13 +852,20 @@ function renderInlineCustomers(container, customers) {
                             <span class="badge bg-light text-dark border"><i class="fas fa-tag me-1"></i>Loại: ${escapeHtml(c.customer_type || 'N/A')}</span>
                             <span class="badge bg-light text-dark border"><i class="fas fa-users-cog me-1"></i>Nhóm: ${escapeHtml(c.customer_group || 'N/A')}</span>
                         </div>
-                        ${gkhlHtml}
                     </div>
                     <div class="col-md-5 text-end">
-                        <div class="fw-bold text-dark h5 mb-1">${formatMoney(c.total_amount)}</div>
-                        <div class="small text-muted mb-2">Đơn quét: Gross ${formatMoney(c.total_gross)} | KM ${formatMoney(c.total_scheme)}</div>
-                        
-                        <div class="p-2 rounded border bg-light d-inline-block text-start" style="font-size: 0.7rem; min-width: 200px;">
+                        <div class="fw-bold text-muted mb-2">Đơn quét: Gross ${formatMoney(c.total_gross)} | KM ${formatMoney(c.total_scheme)}</div>
+                        <div class="fw-bold text-dark h5 mb-0">Net: ${formatMoney(c.total_amount)}</div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: Boxes (GKHL & MTD) -->
+                <div class="row">
+                    <div class="col-md-7">
+                         ${gkhlHtml}
+                    </div>
+                    <div class="col-md-5 text-end">
+                        <div class="p-2 rounded border bg-light d-inline-block text-start mt-2" style="font-size: 0.7rem; width: 100%;">
                             <div class="text-muted fw-bold border-bottom mb-1 pb-1">THỐNG KÊ LŨY KẾ THÁNG (MTD)</div>
                             <div class="d-flex justify-content-between">
                                 <span>Thực thu (Net):</span>

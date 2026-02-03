@@ -716,6 +716,104 @@ $isViewer = isViewer();
 let currentEmployeeData = null;
 let currentBenchmark = null;
 
+// ✅ CASCADING FILTERS LOGIC
+document.addEventListener('DOMContentLoaded', function() {
+    // 1️⃣ Initialize filters on load
+    const khuVucSelect = document.getElementById('filterKhuVuc');
+    const tinhSelect = document.getElementById('filterTinh');
+    const nhanVienSelect = document.getElementById('filterNhanVien');
+    
+    // Get initial values from PHP (if any)
+    const initialKhuVuc = khuVucSelect.value;
+    const initialTinh = '<?= htmlspecialchars($tinh ?? '') ?>';
+    const initialNhanVien = '<?= htmlspecialchars($nhan_vien ?? '') ?>';
+
+    // Initial filtering
+    if (initialKhuVuc) {
+        fetchProvinces(initialKhuVuc, initialTinh);
+    }
+    fetchEmployees(initialKhuVuc, initialTinh, initialNhanVien);
+
+    // 2️⃣ Event Listener: Khu Vực change
+    khuVucSelect.addEventListener('change', function() {
+        const selectedKhuVuc = this.value;
+        
+        // Reset dependent fields
+        tinhSelect.innerHTML = '<option value="">-- Đang tải... --</option>';
+        nhanVienSelect.innerHTML = '<option value="">-- Đang tải... --</option>';
+        
+        // Fetch new data
+        fetchProvinces(selectedKhuVuc, '');
+        fetchEmployees(selectedKhuVuc, '', '');
+    });
+
+    // 3️⃣ Event Listener: Tỉnh change
+    tinhSelect.addEventListener('change', function() {
+        const selectedTinh = this.value;
+        const selectedKhuVuc = khuVucSelect.value;
+        
+        nhanVienSelect.innerHTML = '<option value="">-- Đang tải... --</option>';
+        fetchEmployees(selectedKhuVuc, selectedTinh, '');
+    });
+});
+
+/**
+ * 📡 API: Lấy danh sách Tỉnh theo Khu vực
+ */
+async function fetchProvinces(khuVuc, selectedValue = '') {
+    const tinhSelect = document.getElementById('filterTinh');
+    
+    try {
+        const response = await fetch(`nhanvien_report.php?action=getTinhByKhuVuc&khu_vuc=${encodeURIComponent(khuVuc)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            let html = '<option value="">-- TC --</option>';
+            result.data.forEach(tinh => {
+                const isSelected = (String(tinh) === String(selectedValue)) ? 'selected' : '';
+                html += `<option value="${tinh}" ${isSelected}>${tinh}</option>`;
+            });
+            tinhSelect.innerHTML = html;
+        } else {
+            console.error('Error fetching provinces:', result.error);
+            tinhSelect.innerHTML = '<option value="">-- Lỗi tải --</option>';
+        }
+    } catch (e) {
+        console.error('Network error key fetching provinces:', e);
+        tinhSelect.innerHTML = '<option value="">-- Lỗi mạng --</option>';
+    }
+}
+
+/**
+ * 📡 API: Lấy danh sách Nhân viên theo Filter
+ */
+async function fetchEmployees(khuVuc, tinh, selectedValue = '') {
+    const nhanVienSelect = document.getElementById('filterNhanVien');
+    
+    try {
+        const url = `nhanvien_report.php?action=getNhanVienByFilters&khu_vuc=${encodeURIComponent(khuVuc)}&tinh=${encodeURIComponent(tinh)}`;
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success) {
+            let html = '<option value="">-- Tất cả nhân viên --</option>';
+            result.data.forEach(nv => {
+                const isSelected = (String(nv.ma_nv) === String(selectedValue)) ? 'selected' : '';
+                html += `<option value="${nv.ma_nv}" ${isSelected}>${nv.ho_ten} (${nv.ma_nv})</option>`;
+            });
+            nhanVienSelect.innerHTML = html;
+            
+        } else {
+            console.error('Error fetching employees:', result.error);
+            nhanVienSelect.innerHTML = '<option value="">-- Lỗi tải --</option>';
+        }
+    } catch (e) {
+        console.error('Network error fetching employees:', e);
+        nhanVienSelect.innerHTML = '<option value="">-- Lỗi mạng --</option>';
+    }
+}
+
+
 async function showReportDetails(jsonData, jsonBenchmark) {
     try {
         const data = JSON.parse(jsonData);
