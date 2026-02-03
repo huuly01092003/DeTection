@@ -317,7 +317,7 @@ if (isset($_SESSION['success'])) {
                 <h6><i class="fas fa-info-circle me-2"></i>Tài Khoản Demo</h6>
                 <div class="demo-account">
                     <div>
-                        <strong>Admin:</strong> admin
+                        <strong>Test:</strong> viewer1
                     </div>
                     <code>admin123</code>
                 </div>
