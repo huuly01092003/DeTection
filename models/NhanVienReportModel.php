@@ -44,8 +44,8 @@ class NhanVienReportModel {
      * ✅ LẤY TẤT CẢ NHÂN VIÊN - WITH REDIS CACHE + DB BACKUP
      */
     public function getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang, $khu_vuc = '', $tinh = '', $nhan_vien = '') {
-        // 1️⃣ Tạo cache key (v3 to force refresh with filters)
-        $cacheKey = $this->generateCacheKey('employees_v3', $thang, $tu_ngay, $den_ngay, $khu_vuc, $tinh, $nhan_vien);
+        // 1️⃣ Tạo cache key (v6 to force refresh with 'Cho Si' filter)
+        $cacheKey = $this->generateCacheKey('employees_v6', $thang, $tu_ngay, $den_ngay, $khu_vuc, $tinh, $nhan_vien);
         
         // 2️⃣ Thử lấy từ Redis
         if ($this->redis) {
@@ -70,6 +70,9 @@ class NhanVienReportModel {
         list($year, $month) = explode('-', $thang);
         $den_ngay_end = $den_ngay . ' 23:59:59';
         
+        
+        $reportDate = $year . '-' . $month . '-01';
+
         $sql = "SELECT 
                     o.DSRCode,
                     o.DSRTypeProvince,
@@ -175,14 +178,21 @@ class NhanVienReportModel {
                 AND (
                     (o.OrderDate >= :tu_ngay AND o.OrderDate <= :den_ngay_end)
                     OR (o.RptYear = :year AND o.RptMonth = :month)
-                )";
+                )
+                
+                -- ✅ NEW FILTERS (ROBUST + CHO SI)
+                AND (nv_info.chuc_vu IS NULL OR nv_info.chuc_vu NOT LIKE '%GSBH%')
+                AND (nv_info.bo_phan IS NULL OR (nv_info.bo_phan NOT LIKE '%Siêu thị%' AND nv_info.bo_phan NOT LIKE '%Sieu thi%' AND nv_info.bo_phan NOT LIKE '%Chuỗi%' AND nv_info.bo_phan NOT LIKE '%Chuoi%'))
+                AND (nv_info.kenh_ban_hang IS NULL OR (nv_info.kenh_ban_hang NOT LIKE '%Chợ Sỉ%' AND nv_info.kenh_ban_hang NOT LIKE '%Cho Si%'))
+                AND (nv_info.ngay_vao_cty IS NULL OR TIMESTAMPDIFF(MONTH, nv_info.ngay_vao_cty, :report_date) >= 2)";
 
         // ✅ APPLY FILTERS
         $params = [
             'tu_ngay' => $tu_ngay,
             'den_ngay_end' => $den_ngay_end,
             'year' => $year,
-            'month' => $month
+            'month' => $month,
+            'report_date' => $reportDate
         ];
 
         if (!empty($khu_vuc)) {
@@ -219,7 +229,7 @@ class NhanVienReportModel {
      * ✅ TỔNG THEO THÁNG - WITH REDIS CACHE + DB BACKUP
      */
     public function getSystemStatsForMonth($thang) {
-        $cacheKey = "nhanvien:stats:month:{$thang}";
+        $cacheKey = "nhanvien:stats:month:v4:{$thang}";
         
         // Thử lấy từ Redis
         if ($this->redis) {
@@ -237,8 +247,9 @@ class NhanVienReportModel {
         list($year, $month) = explode('-', $thang);
         $firstDay = "$thang-01";
         $lastDay = date('Y-m-t', strtotime($firstDay));
+        $reportDate = $year . '-' . $month . '-01';
         
-        $dbResults = $this->getFromSummaryTable($cacheKey, 'stats_month', $firstDay, $lastDay, $thang);
+        $dbResults = $this->getFromSummaryTable($cacheKey, 'stats_month_v4', $firstDay, $lastDay, $thang);
         if (!empty($dbResults)) {
             $this->populateRedisFromDB($cacheKey, $dbResults);
             return $dbResults;
@@ -275,6 +286,7 @@ class NhanVienReportModel {
                     AVG(emp_max.max_daily) as ds_ngay_cao_nhat_tb_thang
                     
                 FROM orderdetail o
+                LEFT JOIN dsnv nv_info ON o.DSRCode = nv_info.ma_nv
                 LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
                 LEFT JOIN (
                     SELECT 
@@ -293,15 +305,19 @@ class NhanVienReportModel {
                     GROUP BY DSRCode
                 ) emp_max ON o.DSRCode = emp_max.DSRCode
                 WHERE o.RptYear = :year AND o.RptMonth = :month
-                AND o.DSRCode IS NOT NULL AND o.DSRCode != ''";
+                AND o.DSRCode IS NOT NULL AND o.DSRCode != ''
+                AND (nv_info.chuc_vu IS NULL OR TRIM(nv_info.chuc_vu) NOT LIKE '%GSBH%')
+                AND (nv_info.bo_phan IS NULL OR (TRIM(nv_info.bo_phan) NOT LIKE '%Siêu thị%' AND TRIM(nv_info.bo_phan) NOT LIKE '%Sieu thi%' AND TRIM(nv_info.bo_phan) NOT LIKE '%Chuỗi%' AND TRIM(nv_info.bo_phan) NOT LIKE '%Chuoi%'))
+                AND (nv_info.kenh_ban_hang IS NULL OR (nv_info.kenh_ban_hang NOT LIKE '%Chợ Sỉ%' AND nv_info.kenh_ban_hang NOT LIKE '%Cho Si%'))
+                AND (nv_info.ngay_vao_cty IS NULL OR TIMESTAMPDIFF(MONTH, nv_info.ngay_vao_cty, :report_date) >= 2)";
         
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute(['year' => $year, 'month' => $month]);
+        $stmt->execute(['year' => $year, 'month' => $month, 'report_date' => $reportDate]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Lưu vào cache
         if (!empty($result)) {
-            $this->saveCache($cacheKey, $result, $firstDay, $lastDay, $thang, 'stats_month');
+            $this->saveCache($cacheKey, $result, $firstDay, $lastDay, $thang, 'stats_month_v4');
         }
         
         return $result;
@@ -311,7 +327,7 @@ class NhanVienReportModel {
      * ✅ TỔNG THEO KHOẢNG - WITH REDIS CACHE + DB BACKUP
      */
     public function getSystemStatsForRange($tu_ngay, $den_ngay) {
-        $cacheKey = "nhanvien:stats:range:{$tu_ngay}:{$den_ngay}";
+        $cacheKey = "nhanvien:stats:range:v5:{$tu_ngay}:{$den_ngay}";
         
         // Thử lấy từ Redis
         if ($this->redis) {
@@ -326,7 +342,7 @@ class NhanVienReportModel {
         }
         
         // Thử lấy từ Database backup
-        $dbResults = $this->getFromSummaryTable($cacheKey, 'stats_range', $tu_ngay, $den_ngay);
+        $dbResults = $this->getFromSummaryTable($cacheKey, 'stats_range_v5', $tu_ngay, $den_ngay);
         if (!empty($dbResults)) {
             $this->populateRedisFromDB($cacheKey, $dbResults);
             return $dbResults;
@@ -364,6 +380,7 @@ class NhanVienReportModel {
                     AVG(emp_max.max_daily) as ds_ngay_cao_nhat_tb_khoang
                     
                 FROM orderdetail o
+                LEFT JOIN dsnv nv_info ON o.DSRCode = nv_info.ma_nv
                 LEFT JOIN gkhl g ON o.CustCode = g.MaKHDMS
                 LEFT JOIN (
                     SELECT 
@@ -382,19 +399,26 @@ class NhanVienReportModel {
                     GROUP BY DSRCode
                 ) emp_max ON o.DSRCode = emp_max.DSRCode
                 WHERE o.OrderDate >= :tu_ngay AND o.OrderDate <= :den_ngay_end
-                AND o.DSRCode IS NOT NULL AND o.DSRCode != ''";
+                AND o.DSRCode IS NOT NULL AND o.DSRCode != ''
+                AND (nv_info.chuc_vu IS NULL OR TRIM(nv_info.chuc_vu) NOT LIKE '%GSBH%')
+                AND (nv_info.bo_phan IS NULL OR (TRIM(nv_info.bo_phan) NOT LIKE '%Siêu thị%' AND TRIM(nv_info.bo_phan) NOT LIKE '%Sieu thi%' AND TRIM(nv_info.bo_phan) NOT LIKE '%Chuỗi%' AND TRIM(nv_info.bo_phan) NOT LIKE '%Chuoi%'))
+                AND (nv_info.kenh_ban_hang IS NULL OR (nv_info.kenh_ban_hang NOT LIKE '%Chợ Sỉ%' AND nv_info.kenh_ban_hang NOT LIKE '%Cho Si%'))
+                AND (nv_info.ngay_vao_cty IS NULL OR TIMESTAMPDIFF(MONTH, nv_info.ngay_vao_cty, :report_date) >= 2)";
+        
+        $reportDate = date('Y-m-01', strtotime($den_ngay)); // Use den_ngay or reliable date
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
             'tu_ngay' => $tu_ngay,
             'den_ngay' => $den_ngay,
-            'den_ngay_end' => $den_ngay_end
+            'den_ngay_end' => $den_ngay_end,
+            'report_date' => $reportDate
         ]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Lưu vào cache
         if (!empty($result)) {
-            $this->saveCache($cacheKey, $result, $tu_ngay, $den_ngay, '', 'stats_range');
+            $this->saveCache($cacheKey, $result, $tu_ngay, $den_ngay, '', 'stats_range_v5');
         }
         
         return $result;
@@ -734,7 +758,7 @@ class NhanVienReportModel {
      */
     public function getDailySalesForChart($tu_ngay, $den_ngay, $thang = null) {
         // Thử lấy từ Redis cache trước
-        $cacheKey = "nhanvien:daily_sales:{$tu_ngay}:{$den_ngay}";
+        $cacheKey = "nhanvien:daily_sales:v5:{$tu_ngay}:{$den_ngay}";
         
         if ($this->redis) {
             try {
@@ -748,6 +772,14 @@ class NhanVienReportModel {
         }
 
         $den_ngay_end = $den_ngay . ' 23:59:59';
+        
+        // Determine report date for tenure calculation
+        if ($thang) {
+            $reportDate = $thang . '-01';
+        } else {
+            $reportDate = date('Y-m-01', strtotime($den_ngay));
+        }
+
         $sql = "SELECT 
                     o.DSRCode as dsr_code,
                     COALESCE(nv.ho_ten, CONCAT('NV_', o.DSRCode)) as ten_nv,
@@ -761,13 +793,21 @@ class NhanVienReportModel {
                 AND o.OrderDate <= :den_ngay_end
                 AND o.DSRCode IS NOT NULL 
                 AND o.DSRCode != ''
+                
+                -- ✅ FILTERS APPLIED TO CHART (ROBUST)
+                AND (nv.chuc_vu IS NULL OR nv.chuc_vu NOT LIKE '%GSBH%')
+                AND (nv.bo_phan IS NULL OR (nv.bo_phan NOT LIKE '%Siêu thị%' AND nv.bo_phan NOT LIKE '%Sieu thi%' AND nv.bo_phan NOT LIKE '%Chuỗi%' AND nv.bo_phan NOT LIKE '%Chuoi%'))
+                AND (nv.kenh_ban_hang IS NULL OR (nv.kenh_ban_hang NOT LIKE '%Chợ Sỉ%' AND nv.kenh_ban_hang NOT LIKE '%Cho Si%'))
+                AND (nv.ngay_vao_cty IS NULL OR TIMESTAMPDIFF(MONTH, nv.ngay_vao_cty, :report_date) >= 2)
+                
                 GROUP BY o.DSRCode, nv.ho_ten, DATE(o.OrderDate)
                 ORDER BY o.DSRCode, DATE(o.OrderDate)";
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
             'tu_ngay' => $tu_ngay,
-            'den_ngay_end' => $den_ngay_end
+            'den_ngay_end' => $den_ngay_end,
+            'report_date' => $reportDate
         ]);
         
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -807,6 +847,10 @@ class NhanVienReportModel {
                 FROM orderdetail o
                 LEFT JOIN dsnv nv ON o.DSRCode = nv.ma_nv
                 WHERE o.DSRCode IS NOT NULL AND o.DSRCode != ''
+                AND (nv.chuc_vu IS NULL OR nv.chuc_vu NOT LIKE '%GSBH%')
+                AND (nv.bo_phan IS NULL OR (nv.bo_phan NOT LIKE '%Siêu thị%' AND nv.bo_phan NOT LIKE '%Sieu thi%' AND nv.bo_phan NOT LIKE '%Chuỗi%' AND nv.bo_phan NOT LIKE '%Chuoi%'))
+                AND (nv.kenh_ban_hang IS NULL OR (nv.kenh_ban_hang NOT LIKE '%Chợ Sỉ%' AND nv.kenh_ban_hang NOT LIKE '%Cho Si%'))
+                AND (nv.ngay_vao_cty IS NULL OR TIMESTAMPDIFF(MONTH, nv.ngay_vao_cty, :report_date) >= 2)
                 AND (
                     (DATE(o.OrderDate) >= :tu_ngay AND DATE(o.OrderDate) <= :den_ngay)
                     OR (o.RptYear = :year AND o.RptMonth = :month)
@@ -816,9 +860,12 @@ class NhanVienReportModel {
                 ORDER BY (ds_khoang / NULLIF(ds_thang, 0)) DESC, ds_khoang DESC
                 LIMIT :limit";
         
+        $reportDate = $year . '-' . $month . '-01';
+
         $stmt = $this->conn->prepare($sql);
         $stmt->bindValue(':tu_ngay', $tu_ngay, PDO::PARAM_STR);
         $stmt->bindValue(':den_ngay', $den_ngay, PDO::PARAM_STR);
+        $stmt->bindValue(':report_date', $reportDate, PDO::PARAM_STR);
         $stmt->bindValue(':year', $year, PDO::PARAM_STR);
         $stmt->bindValue(':month', $month, PDO::PARAM_STR);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);

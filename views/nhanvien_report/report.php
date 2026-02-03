@@ -426,11 +426,8 @@ $isViewer = isViewer();
                                 <th class="text-center" style="width: 60px;">#</th>
                                 <th style="width: 100px;">Mã NV</th>
                                 <th style="width: 150px;">Tên Nhân Viên</th>
-                                <th style="width: 120px;">Bộ Phận</th>
-                                <th style="width: 100px;">Chức Vụ</th>
+                                <th style="width: 80px;">Khu Vực</th>
                                 <th style="width: 80px;">Base Tỉnh</th>
-                                <th style="width: 80px;">Mã NVQL</th>
-                                <th style="width: 120px;">Tên NVQL</th>
                                 <th style="width: 100px;">Ngày Vào Làm</th>
                                 <th class="text-end">DS Tháng Tìm Kiếm</th>
                                 <th class="text-end">DS Tiến Độ Tìm Kiếm</th>
@@ -482,11 +479,8 @@ $isViewer = isViewer();
                                 </td>
                                 <td><strong><?= htmlspecialchars($r['ma_nv']) ?></strong></td>
                                 <td><?= htmlspecialchars($r['ten_nv'] ?? '') ?></td>
-                                <td><span class="badge bg-secondary"><?= htmlspecialchars($r['bo_phan'] ?? 'N/A') ?></span></td>
-                                <td><span class="badge bg-info text-dark"><?= htmlspecialchars($r['chuc_vu'] ?? 'N/A') ?></span></td>
+                                <td><?= htmlspecialchars($r['khu_vuc'] ?? '') ?></td>
                                 <td><?= htmlspecialchars($r['base_tinh'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($r['ma_nv_ql'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($r['ten_nv_ql'] ?? '') ?></td>
                                 <td><?= !empty($r['ngay_vao_cty']) ? date('d/m/Y', strtotime($r['ngay_vao_cty'])) : '' ?></td>
                                 <td class="text-end"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</td>
                                 <td class="text-end"><?= number_format($r['ds_tien_do'], 0) ?>đ</td>
@@ -527,7 +521,7 @@ $isViewer = isViewer();
                                         <td class="text-center">
                                             <small class="fw-bold text-muted"><?= date('m/y', strtotime($hMonth)) ?></small>
                                         </td>
-                                        <td colspan="8" class="text-end text-muted fst-italic">
+                                        <td colspan="5" class="text-end text-muted fst-italic">
                                             <small>Lịch sử (<?= date('d/m', strtotime($hData['tu_ngay'])) ?> - <?= date('d/m', strtotime($hData['den_ngay'])) ?>)</small>
                                         </td>
                                         <td class="text-end text-muted"><?= number_format($hEmp['ds_tim_kiem'], 0) ?>đ</td>
@@ -562,7 +556,7 @@ $isViewer = isViewer();
 
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <tr><td colspan="14" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
+                            <tr><td colspan="11" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
                         <?php endif; ?>
                         </tbody>
                     </table>
@@ -610,7 +604,7 @@ $isViewer = isViewer();
                                         <?php if ($r['rank'] > 0): ?>
                                             <span class="badge bg-secondary">#<?= $r['rank'] ?></span>
                                         <?php endif; ?>
-                                        <span class="badge bg-light text-dark border"><?= htmlspecialchars($r['bo_phan']) ?></span>
+
                                     </div>
                                     <button class="btn btn-sm btn-outline-primary shadow-sm" 
                                             type="button"
