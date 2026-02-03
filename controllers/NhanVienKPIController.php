@@ -114,12 +114,14 @@ class NhanVienKPIController {
             $bo_phan = !empty($_GET['bo_phan']) ? trim($_GET['bo_phan']) : '';
             $chuc_vu = !empty($_GET['chuc_vu']) ? trim($_GET['chuc_vu']) : '';
             $nhan_vien = !empty($_GET['nhan_vien']) ? trim($_GET['nhan_vien']) : '';
+            $specific_product_code = !empty($_GET['specific_product']) ? trim($_GET['specific_product']) : '';
             
             $filters = [
                 'thang' => $thang,
                 'tu_ngay' => $tu_ngay,
                 'den_ngay' => $den_ngay,
                 'product_filter' => $product_filter,
+                'specific_product' => $specific_product_code,
                 'threshold_n' => $threshold_n,
                 'khu_vuc' => $khu_vuc,
                 'tinh' => $tinh,
@@ -129,7 +131,7 @@ class NhanVienKPIController {
             ];
             
             // ✅ LẤY DỮ LIỆU
-            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter, $threshold_n, $khu_vuc, $tinh, $bo_phan, $chuc_vu, $nhan_vien);
+            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter, $threshold_n, $khu_vuc, $tinh, $bo_phan, $chuc_vu, $nhan_vien, $specific_product_code);
             
             if (empty($employees)) {
                 $message = "⚠️ Không có dữ liệu nhân viên.";
@@ -155,7 +157,7 @@ class NhanVienKPIController {
                 return;
             }
             
-            $system_metrics = $this->model->getSystemMetrics($tu_ngay, $den_ngay, $product_filter);
+            $system_metrics = $this->model->getSystemMetrics($tu_ngay, $den_ngay, $product_filter, $specific_product_code);
             
             $emp_count = $system_metrics['emp_count'];
             $total_orders = $system_metrics['total_orders'];
@@ -175,10 +177,6 @@ class NhanVienKPIController {
                 
                 if ($emp_kpi['violation_count'] > 0) {
                     $reasons[] = "Vi phạm ngưỡng {$emp_kpi['violation_count']} ngày";
-                }
-                
-                if ($analysis['multi_order_customers_total'] > 0) {
-                    $reasons[] = "✂️ Phát hiện chẻ đơn (" . $analysis['multi_order_customers_total'] . " trường hợp)";
                 }
                 
                 if ($analysis['risk_breakdown']['scheme'] > 0) {
@@ -279,6 +277,7 @@ class NhanVienKPIController {
         $tu_ngay = $_GET['tu_ngay'] ?? '';
         $den_ngay = $_GET['den_ngay'] ?? '';
         $product_filter = $_GET['product_filter'] ?? '';
+        $specific_product = $_GET['specific_product'] ?? '';
         
         if (empty($dsr_code) || empty($tu_ngay) || empty($den_ngay)) {
             echo json_encode(['success' => false, 'error' => 'Missing parameters']);
@@ -286,7 +285,7 @@ class NhanVienKPIController {
         }
         
         try {
-            $customers = $this->model->getEmployeeCustomerDetails($dsr_code, $tu_ngay, $den_ngay, $product_filter);
+            $customers = $this->model->getEmployeeCustomerDetails($dsr_code, $tu_ngay, $den_ngay, $product_filter, $specific_product);
             echo json_encode(['success' => true, 'data' => $customers]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -345,6 +344,27 @@ class NhanVienKPIController {
         try {
             $nhanvien_list = $this->model->getNhanVienByFilters($khu_vuc, $tinh, $bo_phan, $chuc_vu);
             echo json_encode(['success' => true, 'data' => $nhanvien_list]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ✅ AJAX: Lấy danh sách sản phẩm theo nhóm
+     */
+    public function getProductsByGroup() {
+        header('Content-Type: application/json');
+        
+        $group_code = $_GET['group_code'] ?? '';
+        
+        if (empty($group_code)) {
+            echo json_encode(['success' => false, 'data' => []]);
+            return;
+        }
+        
+        try {
+            $products = $this->model->getProductsByGroup($group_code);
+            echo json_encode(['success' => true, 'data' => $products]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

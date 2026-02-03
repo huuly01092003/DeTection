@@ -339,12 +339,20 @@ $isViewer = isViewer();
                     
                     <div class="col-md-2">
                         <label class="form-label fw-bold"><i class="fas fa-box"></i> Nhóm SP</label>
-                        <select name="product_filter" class="form-select">
+                        <select name="product_filter" id="productGroupSelect" class="form-select">
                             <option value="">-- Tất Cả --</option>
                             <?php if (!empty($available_products)): foreach ($available_products as $p): ?>
                                 <option value="<?= htmlspecialchars($p) ?>" <?= ($p === ($filters['product_filter'] ?? '')) ? 'selected' : '' ?>><?= htmlspecialchars($p) ?></option>
                             <?php endforeach; endif; ?>
                         </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold"><i class="fas fa-box-open"></i> Tên SP</label>
+                        <select name="specific_product" id="productNameSelect" class="form-select" <?= empty($filters['product_filter']) ? 'disabled' : '' ?>>
+                            <option value="">-- Tất Cả Sản Phẩm --</option>
+                        </select>
+                         <input type="hidden" id="selectedSpecificProduct" value="<?= htmlspecialchars($filters['specific_product'] ?? '') ?>">
                     </div>
                     
                     <div class="col-md-2">
@@ -644,28 +652,22 @@ function showDetail(data) {
             </div>
             <div class="col-12 col-md-9">
                 <div class="row g-2">
-                    <div class="col-6 col-md-3">
+                    <div class="col-4">
                         <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
-                            <div class="small text-muted text-truncate" title="Vượt Ngưỡng">Vượt Ngưỡng</div>
-                            <div class="fw-bold text-danger">${Math.round(rb.threshold)}đ</div>
+                            <div class="small text-muted text-truncate" title="Vượt Ngưỡng (Max 80đ)">Vượt Ngưỡng</div>
+                            <div class="fw-bold text-danger">${Math.round(rb.threshold || 0)}đ</div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-4">
                         <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
-                            <div class="small text-muted text-truncate" title="Chẻ/Gộp Đơn">Chẻ/Gộp Đơn</div>
-                            <div class="fw-bold text-info">${Math.round(rb.splitting)}đ</div>
+                            <div class="small text-muted text-truncate" title="Lạm Dụng KM (Max 10đ)">Lạm Dụng KM</div>
+                            <div class="fw-bold text-warning">${Math.round(rb.scheme || 0)}đ</div>
                         </div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-4">
                         <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
-                            <div class="small text-muted text-truncate" title="Lạm Dụng KM">Lạm Dụng KM</div>
-                            <div class="fw-bold text-warning">${Math.round(rb.scheme)}đ</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-2 border rounded bg-white text-center shadow-sm h-100">
-                            <div class="small text-muted text-truncate" title="Liên Tiếp">Liên Tiếp</div>
-                            <div class="fw-bold text-secondary">${Math.round(rb.consecutive)}đ</div>
+                            <div class="small text-muted text-truncate" title="Liên Tiếp (Max 10đ)">Liên Tiếp</div>
+                            <div class="fw-bold text-secondary">${Math.round(rb.consecutive || 0)}đ</div>
                         </div>
                     </div>
                 </div>
@@ -780,7 +782,10 @@ function toggleDayDetails(index, dsrCode, date) {
             dsr_code: dsrCode,
             tu_ngay: date,
             den_ngay: date,
-            product_filter: '<?= $filters['product_filter'] ?? '' ?>'
+            tu_ngay: date,
+            den_ngay: date,
+            product_filter: '<?= $filters['product_filter'] ?? '' ?>',
+            specific_product: '<?= $filters['specific_product'] ?? '' ?>'
         });
 
         fetch(`nhanvien_kpi.php?${params}`)
@@ -1161,6 +1166,50 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load danh sách nhân viên ban đầu
     updateNhanVienDropdown();
+});
+
+// ✅ LOGIC DROPDOWN SẢN PHẨM ĐỘNG
+document.addEventListener('DOMContentLoaded', function() {
+    const groupSelect = document.getElementById('productGroupSelect');
+    const productSelect = document.getElementById('productNameSelect');
+    const selectedSpecificProduct = document.getElementById('selectedSpecificProduct').value;
+
+    function loadProducts(groupCode, selectedValue = '') {
+        if (!groupCode) {
+            productSelect.innerHTML = '<option value="">-- Tất Cả Sản Phẩm --</option>';
+            productSelect.disabled = true;
+            return;
+        }
+
+        productSelect.disabled = true;
+        fetch(`nhanvien_kpi.php?action=get_products_by_group&group_code=${groupCode}`)
+            .then(response => response.json())
+            .then(data => {
+                let options = '<option value="">-- Tất Cả Sản Phẩm --</option>';
+                if (data.success && data.data) {
+                    data.data.forEach(p => {
+                        const isSelected = (p.ProductCode === selectedValue) ? 'selected' : '';
+                        options += `<option value="${p.ProductCode}" ${isSelected}>${p.ProductCode} - ${p.ProductName}</option>`;
+                    });
+                }
+                productSelect.innerHTML = options;
+                productSelect.disabled = false;
+            })
+            .catch(err => {
+                console.error("Lỗi tải sản phẩm:", err);
+                productSelect.disabled = false;
+            });
+    }
+
+    // Event listener
+    groupSelect.addEventListener('change', function() {
+        loadProducts(this.value);
+    });
+
+    // Initial load if having pre-selected group
+    if (groupSelect.value) {
+        loadProducts(groupSelect.value, selectedSpecificProduct);
+    }
 });
 </script>
 </body>

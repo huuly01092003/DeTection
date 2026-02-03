@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jan 27, 2026 at 05:28 PM
+-- Generation Time: Feb 03, 2026 at 09:53 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -66,6 +66,17 @@ CREATE TABLE `dsnv` (
   `ma_nv_ql` varchar(20) DEFAULT NULL,
   `ten_nv_ql` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `dssp`
+--
+
+CREATE TABLE `dssp` (
+  `ProductCode` varchar(20) NOT NULL,
+  `ProductName` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -181,7 +192,7 @@ CREATE TABLE `summary_anomaly_results` (
 
 CREATE TABLE `summary_nhanvien_kpi_cache` (
   `id` int(11) NOT NULL,
-  `cache_key` varchar(100) NOT NULL,
+  `cache_key` varchar(255) DEFAULT NULL,
   `tu_ngay` date NOT NULL,
   `den_ngay` date NOT NULL,
   `product_filter` varchar(10) DEFAULT NULL,
@@ -309,6 +320,12 @@ ALTER TABLE `dskh`
 --
 ALTER TABLE `dsnv`
   ADD PRIMARY KEY (`ma_nv`);
+
+--
+-- Indexes for table `dssp`
+--
+ALTER TABLE `dssp`
+  ADD PRIMARY KEY (`ProductCode`);
 
 --
 -- Indexes for table `gkhl`

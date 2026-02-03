@@ -140,6 +140,123 @@ class NhanVienReportController {
     }
 
     /**
+     * ✅ XUẤT EXCEL (CSV)
+     */
+    public function exportExcel() {
+        // Prevent output buffering issues
+        if (ob_get_level()) ob_end_clean();
+        
+        $currentUser = AuthMiddleware::getCurrentUser();
+        
+        $tu_ngay = $_GET['tu_ngay'] ?? '';
+        $den_ngay = $_GET['den_ngay'] ?? '';
+        $thang = $_GET['thang'] ?? '';
+        $khu_vuc = $_GET['khu_vuc'] ?? '';
+        $tinh = $_GET['tinh'] ?? '';
+        $nhan_vien = $_GET['nhan_vien'] ?? '';
+        $he_so = isset($_GET['he_so']) && is_numeric($_GET['he_so']) ? floatval($_GET['he_so']) : 1.5;
+
+        // Validation cơ bản
+        if (empty($tu_ngay) || empty($den_ngay) || empty($thang)) {
+            die("Vui lòng chọn đầy đủ thông tin lọc để xuất báo cáo.");
+        }
+
+        // Lấy thông tin thống kê để tính ngưỡng nghi vấn
+        $stats_thang = $this->model->getSystemStatsForMonth($thang);
+        $stats_khoang = $this->model->getSystemStatsForRange($tu_ngay, $den_ngay);
+        
+        $tong_tien_ky = $stats_thang['total'] ?? 0;
+        $tong_tien_khoang = $stats_khoang['total'] ?? 0;
+        
+        $ket_qua_chung = ($tong_tien_ky > 0) ? ($tong_tien_khoang / $tong_tien_ky) : 0;
+        $ty_le_nghi_van = $ket_qua_chung * $he_so;
+
+        // Lấy danh sách nhân viên
+        $employees = $this->model->getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang, $khu_vuc, $tinh, $nhan_vien);
+
+        // ✅ LOGIC SẮP XẾP Y NHƯ BẢNG (SHOWREPORT)
+        $report_nghi_van = [];
+        $report_ok = [];
+
+        foreach ($employees as $emp) {
+            $ds_tim_kiem = $emp['ds_tong_thang_nv'] ?? 0;
+            $ds_tien_do = $emp['ds_tien_do'] ?? 0;
+            
+            // Chỉ lấy nhân viên có dữ liệu
+            if ($ds_tien_do > 0 || $ds_tim_kiem > 0) {
+                $ty_le = ($ds_tim_kiem > 0) ? ($ds_tien_do / $ds_tim_kiem) : 0;
+                
+                $row = $emp;
+                $row['ds_tim_kiem'] = $ds_tim_kiem;
+                $row['ds_tien_do'] = $ds_tien_do;
+                $row['ty_le'] = $ty_le;
+                $row['trang_thai_text'] = 'OK';
+                
+                if ($ty_le >= $ty_le_nghi_van) {
+                    $row['trang_thai_text'] = 'Nghi Vấn';
+                    $report_nghi_van[] = $row;
+                } else {
+                    $report_ok[] = $row;
+                }
+            }
+        }
+
+        // Sắp xếp danh sách nghi vấn (giảm dần theo tỷ lệ)
+        usort($report_nghi_van, function($a, $b) {
+            return $b['ty_le'] <=> $a['ty_le'];
+        });
+
+        // Gộp lại: Nghi vấn trước, OK sau
+        $final_list = array_merge($report_nghi_van, $report_ok);
+
+        // Filename
+        $filename = "BaoCao_KSDSNV_" . date('Ymd_His') . ".csv";
+
+        // Headers for download
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        // Open output stream
+        $output = fopen('php://output', 'w');
+        
+        // Add BOM for Excel UTF-8
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        
+        // CSV Headers
+        fputcsv($output, [
+            'STT', 
+            'Mã NV', 
+            'Tên Nhân Viên', 
+            'Khu Vực', 
+            'Base Tỉnh', 
+            'Ngày Vào Làm', 
+            'DS Tháng Tìm Kiếm', 
+            'DS Tiến Độ Tìm Kiếm', 
+            '% Tiến Độ', 
+            'Trạng Thái'
+        ]);
+
+        $stt = 1;
+        foreach ($final_list as $emp) {
+            fputcsv($output, [
+                $stt++,
+                "'" . ($emp['DSRCode'] ?? ''), // Force text format for ID
+                $emp['ten_nhan_vien'] ?? $emp['DSRCode'],
+                $emp['khu_vuc'] ?? '',
+                $emp['base_tinh'] ?? '',
+                !empty($emp['ngay_vao_cty']) ? date('d/m/Y', strtotime($emp['ngay_vao_cty'])) : '',
+                number_format($emp['ds_tim_kiem'], 0, ',', '.'),
+                number_format($emp['ds_tien_do'], 0, ',', '.'),
+                number_format($emp['ty_le'] * 100, 2, ',', '.') . '%',
+                $emp['trang_thai_text']
+            ]);
+        }
+        
+        fclose($output);
+        exit;
+    }
+
+    /**
      * ✅ HIỂN THỊ BÁO CÁO CHÍNH
      * Permission: Tất cả role có thể xem
      */

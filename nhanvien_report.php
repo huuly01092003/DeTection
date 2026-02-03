@@ -36,6 +36,11 @@ switch ($action) {
         // Lấy dữ liệu doanh số theo ngày cho biểu đồ (AJAX)
         $controller->getDailySalesChart();
         break;
+
+    case 'export_excel':
+        // Xuất báo cáo ra Excel
+        $controller->exportExcel();
+        break;
         
     case 'report':
     default:

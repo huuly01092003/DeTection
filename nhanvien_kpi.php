@@ -36,6 +36,11 @@ switch ($action) {
         $controller->getNhanVienByFilters();
         break;
 
+    case 'get_products_by_group':
+        // ✅ Lấy danh sách sản phẩm theo nhóm (AJAX)
+        $controller->getProductsByGroup();
+        break;
+
     case 'report':
     default:
         // Hiển thị báo cáo KPI

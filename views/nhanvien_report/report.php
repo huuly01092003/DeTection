@@ -317,12 +317,15 @@ $isViewer = isViewer();
                         </select>
                     </div>
                     
-                    <div class="col-12 col-md-2 d-flex align-items-end mt-2">
-                        <button type="submit" class="btn btn-primary w-100 shadow-sm fw-bold">
+                    <div class="col-12 col-md-3 d-flex align-items-end mt-2">
+                        <button type="submit" class="btn btn-primary shadow-sm fw-bold me-2">
                             <i class="fas fa-filter"></i> Xem
                         </button>
                         <?php if ($has_filtered): ?>
-                            <a href="nhanvien_report.php" class="btn btn-outline-secondary ms-2" title="Reset Filters">
+                            <button type="submit" name="action" value="export_excel" class="btn btn-success shadow-sm fw-bold me-2" title="Xuất Excel">
+                                <i class="fas fa-file-excel"></i>
+                            </button>
+                            <a href="nhanvien_report.php" class="btn btn-outline-secondary" title="Reset Filters">
                                 <i class="fas fa-undo"></i>
                             </a>
                         <?php endif; ?>
