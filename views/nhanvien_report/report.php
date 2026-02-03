@@ -103,6 +103,20 @@ $isViewer = isViewer();
             box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
             border-color: rgba(102, 126, 234, 0.2);
         }
+        .table-responsive {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* ✅ Tablet Optimization: Reduce font size to fit table better */
+        @media (min-width: 768px) and (max-width: 1200px) {
+            .table.kpi-table {
+                font-size: 0.8rem;
+            }
+            .table.kpi-table th, .table.kpi-table td {
+                padding: 0.5rem 0.3rem; 
+            }
+        }
         .info-box h5 { 
             margin-bottom: 5px; 
             font-weight: 800; 
@@ -956,13 +970,13 @@ function renderEmployeeInfoTab() {
                         <div class="p-3 border rounded shadow-sm bg-light">
                             <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-user-circle"></i> Nhân Sự & Chất Lượng Bán Hàng</h6>
                             <div class="row g-2">
-                                <div class="col-md-6"><strong>Họ Tên:</strong> ${escapeHtml(data.ten_nv)}</div>
-                                <div class="col-md-6"><strong>Bộ Phận:</strong> <span class="badge bg-secondary">${escapeHtml(data.bo_phan || 'N/A')}</span></div>
+                                <div class="col-12 col-md-6"><strong>Họ Tên:</strong> ${escapeHtml(data.ten_nv)}</div>
+                                <div class="col-12 col-md-6"><strong>Bộ Phận:</strong> <span class="badge bg-secondary">${escapeHtml(data.bo_phan || 'N/A')}</span></div>
                                 
-                                <div class="col-md-3 text-primary"><strong><i class="fas fa-box"></i> Tổng đơn:</strong> ${ordersRange_NV} đơn</div>
-                                <div class="col-md-3 text-primary"><strong><i class="fas fa-users"></i> Số khách:</strong> ${customersRange_NV} KH</div>
-                                <div class="col-md-3 text-primary"><strong><i class="fas fa-tag"></i> AOV (TB đơn):</strong> ${formatCurrency(aovRange_NV)}</div>
-                                <div class="col-md-3 text-success"><strong><i class="fas fa-shield-alt"></i> GKHL:</strong> ${formatCurrency(data.ds_gkhl_khoang || 0)}</div>
+                                <div class="col-6 col-lg-3 text-primary"><strong><i class="fas fa-box"></i> Tổng đơn:</strong> ${ordersRange_NV} đơn</div>
+                                <div class="col-6 col-lg-3 text-primary"><strong><i class="fas fa-users"></i> Số khách:</strong> ${customersRange_NV} KH</div>
+                                <div class="col-6 col-lg-3 text-primary"><strong><i class="fas fa-tag"></i> AOV (TB đơn):</strong> ${formatCurrency(aovRange_NV)}</div>
+                                <div class="col-6 col-lg-3 text-success"><strong><i class="fas fa-shield-alt"></i> GKHL:</strong> ${formatCurrency(data.ds_gkhl_khoang || 0)}</div>
                             </div>
                         </div>
                     </div>
@@ -970,7 +984,7 @@ function renderEmployeeInfoTab() {
 
                 <div class="row">
                     <!-- 2. Chỉ số hiệu suất & Bất thường -->
-                    <div class="col-md-7">
+                    <div class="col-lg-7 mb-3 mb-lg-0">
                         <div class="p-3 border rounded shadow-sm h-100">
                             <h6 class="text-danger border-bottom pb-2 mb-3"><i class="fas fa-exclamation-triangle"></i> Chỉ Số Cảnh Báo Bất Thường</h6>
                             
@@ -1018,7 +1032,7 @@ function renderEmployeeInfoTab() {
                     </div>
 
                     <!-- 3. So sánh chi tiết -->
-                    <div class="col-md-5">
+                    <div class="col-lg-5">
                         <div class="p-3 border rounded shadow-sm h-100 bg-white">
                             <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-balance-scale"></i> So Với Hệ Thống</h6>
                             

@@ -293,7 +293,7 @@ if (isset($_SESSION['success'])) {
             <form method="POST" action="">
                 <div class="form-floating">
                     <input type="text" class="form-control" id="username" name="username" 
-                           placeholder="Tên đăng nhập" required autofocus value="admin">
+                           placeholder="Tên đăng nhập" required autofocus>
                     <label for="username">
                         <i class="fas fa-user me-2"></i>Tên đăng nhập
                     </label>
@@ -301,7 +301,7 @@ if (isset($_SESSION['success'])) {
                 
                 <div class="form-floating">
                     <input type="password" class="form-control" id="password" name="password" 
-                           placeholder="Mật khẩu" required value="admin123">
+                           placeholder="Mật khẩu" required>
                     <label for="password">
                         <i class="fas fa-lock me-2"></i>Mật khẩu
                     </label>
